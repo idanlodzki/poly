@@ -1,0 +1,6 @@
+nbainjuries
+httpx
+pydantic
+pandas
+click
+rich

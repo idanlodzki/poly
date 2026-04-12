@@ -1,0 +1,2578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NBA Injury Report — Live</title>
+<style>
+  :root {
+    --bg: #f8f9fb;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text: #1a1a2e;
+    --text-secondary: #6b7280;
+    --accent: #4f46e5;
+    --red: #ef4444;
+    --red-bg: #fef2f2;
+    --orange: #f97316;
+    --orange-bg: #fff7ed;
+    --yellow: #eab308;
+    --yellow-bg: #fefce8;
+    --green: #22c55e;
+    --green-bg: #f0fdf4;
+    --blue: #3b82f6;
+    --blue-bg: #eff6ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .layout {
+    display: flex;
+    gap: 0;
+    min-height: 100vh;
+  }
+
+  .main {
+    flex: 1;
+    padding: 24px 32px;
+    overflow-x: auto;
+    min-width: 0;
+  }
+
+  .sidebar {
+    width: 340px;
+    min-width: 340px;
+    background: var(--card);
+    border-left: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+    max-height: 100vh;
+    position: sticky;
+    top: 0;
+  }
+
+  h1 {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+
+  .subtitle .live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .controls input,
+  .controls select {
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--card);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .controls input:focus,
+  .controls select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  }
+
+  .controls input { width: 220px; }
+  .controls select { min-width: 140px; }
+
+  .last-report {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  .last-report strong { color: var(--text); }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .status-pill::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #9ca3af;
+  }
+
+  .status-pill.connected::before { background: var(--green); }
+  .status-pill.normal::before { background: var(--blue); }
+  .status-pill.aggressive::before { background: var(--orange); }
+  .status-pill.disconnected::before { background: var(--red); }
+
+  .search-wrap {
+    position: relative;
+    min-width: 240px;
+  }
+
+  .search-wrap input {
+    width: 100%;
+  }
+
+  .suggestions {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 20;
+    display: none;
+  }
+
+  .suggestion-item {
+    padding: 10px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .suggestion-item:last-child {
+    border-bottom: none;
+  }
+
+  .suggestion-item:hover {
+    background: #f9fafb;
+  }
+
+  .multi-select {
+    position: relative;
+    min-width: 180px;
+  }
+
+  .filter-button {
+    width: 100%;
+    text-align: left;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .filter-button.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+  }
+
+  .filter-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 280px;
+    max-height: 280px;
+    overflow-y: auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    padding: 8px;
+    z-index: 20;
+    display: none;
+  }
+
+  .filter-menu.open {
+    display: block;
+  }
+
+  .filter-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .filter-option:hover {
+    background: #f9fafb;
+  }
+
+  .filter-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 4px 10px;
+    border-bottom: 1px solid #f3f4f6;
+    margin-bottom: 6px;
+  }
+
+  .filter-chip-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .range-filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .range-filter-value {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .range-sliders {
+    display: grid;
+    gap: 6px;
+  }
+
+  .range-row {
+    display: grid;
+    grid-template-columns: 38px 1fr 28px;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .range-row-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .range-row-value {
+    font-size: 12px;
+    color: var(--text);
+    text-align: right;
+    font-weight: 600;
+  }
+
+  .range-row.date-range-row {
+    grid-template-columns: 38px 1fr 96px;
+  }
+
+  .range-row-value.date-range-value {
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  .range-sliders input[type="range"] {
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--card);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  thead th {
+    background: #f9fafb;
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  thead th:hover { color: var(--accent); }
+
+  thead th .sort-icon {
+    margin-left: 4px;
+    opacity: 0.4;
+    font-size: 10px;
+  }
+
+  thead th.sorted .sort-icon { opacity: 1; color: var(--accent); }
+
+  tbody tr {
+    transition: background 0.1s;
+  }
+
+  tbody tr:hover { background: #f9fafb; }
+
+  tbody td {
+    padding: 10px 16px;
+    font-size: 14px;
+    border-bottom: 1px solid #f3f4f6;
+    vertical-align: middle;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .badge-out { background: var(--red-bg); color: var(--red); }
+  .badge-doubtful { background: var(--orange-bg); color: var(--orange); }
+  .badge-questionable { background: var(--yellow-bg); color: #a16207; }
+  .badge-probable { background: var(--green-bg); color: #16a34a; }
+  .badge-available { background: var(--blue-bg); color: var(--blue); }
+
+  .news-positive {
+    color: #16a34a;
+    font-weight: 600;
+  }
+
+  .news-negative {
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  .news-neutral {
+    color: var(--text-secondary);
+  }
+
+  .score-positive {
+    color: #16a34a;
+    font-weight: 600;
+  }
+
+  .score-negative {
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  .score-neutral {
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .notif-score {
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  .details-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .details-btn:hover {
+    background: #f9fafb;
+    color: var(--text);
+  }
+
+  .game-news-summary {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+
+  .game-news-summary strong {
+    color: var(--text);
+  }
+
+  .details-row td {
+    background: #fafafa;
+    padding: 0;
+  }
+
+  .details-panel {
+    padding: 14px 16px;
+  }
+
+  .details-panel-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .details-table {
+    width: 100%;
+    border-collapse: collapse;
+    box-shadow: none;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .details-table th,
+  .details-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #eceff3;
+    font-size: 12px;
+    text-align: left;
+  }
+
+  .details-table th {
+    background: transparent;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+    cursor: default;
+  }
+
+  .details-table th:hover {
+    color: var(--text-secondary);
+  }
+
+  .transition-sections {
+    display: grid;
+    gap: 16px;
+  }
+
+  .transition-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  .transition-section h3 {
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+
+  .transition-section p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+  }
+
+  .transition-grid-wrap {
+    overflow-x: auto;
+  }
+
+  .transition-grid {
+    min-width: 720px;
+    box-shadow: none;
+    border: 1px solid var(--border);
+  }
+
+  .transition-grid thead th,
+  .transition-grid tbody td {
+    text-align: center;
+  }
+
+  .transition-grid thead th {
+    cursor: default;
+  }
+
+  .transition-grid thead th:hover {
+    color: var(--text-secondary);
+  }
+
+  .transition-grid .state-cell {
+    background: #f9fafb;
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .transition-grid .same-state-cell {
+    color: #9ca3af;
+    background: #f9fafb;
+    font-weight: 600;
+  }
+
+  .transition-score-input {
+    width: 78px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--card);
+  }
+
+  .transition-score-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  }
+
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .sidebar-header h2 {
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  .notif-badge {
+    background: var(--accent);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 20px;
+    min-width: 28px;
+    text-align: center;
+  }
+
+  .notif-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .notif-item {
+    padding: 12px 0;
+    border-bottom: 1px solid #f3f4f6;
+    animation: fadeIn 0.3s;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .notif-item:last-child { border-bottom: none; }
+
+  .notif-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+    margin-right: 8px;
+    flex-shrink: 0;
+    vertical-align: middle;
+  }
+
+  .notif-icon.added { background: var(--blue-bg); color: var(--blue); }
+  .notif-icon.removed { background: var(--red-bg); color: var(--red); }
+  .notif-icon.status_change { background: var(--yellow-bg); color: #a16207; }
+  .notif-icon.injury_change { background: var(--green-bg); color: #16a34a; }
+
+  .notif-player {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .notif-detail {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  .notif-time {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 2px;
+  }
+
+  .clear-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .clear-btn:hover {
+    background: #f3f4f6;
+    color: var(--text);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 60px;
+    color: var(--text-secondary);
+  }
+
+  .loading .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .count-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+
+  .count-label strong { color: var(--text); }
+
+  @media (max-width: 1100px) {
+    .sidebar { width: 300px; min-width: 300px; }
+  }
+
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    .sidebar {
+      width: 100%;
+      min-width: 100%;
+      border-left: none;
+      border-top: 1px solid var(--border);
+      max-height: 50vh;
+      position: relative;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="main">
+    <h1>NBA Dashboard</h1>
+    <p class="subtitle">
+      <span class="live-dot"></span>
+      Live injury feed plus a player-importance database. Times shown in your local timezone.
+    </p>
+
+    <div class="controls" style="margin-bottom:12px">
+      <button class="clear-btn" id="tabInjuries">Injury Report</button>
+      <button class="clear-btn" id="tabGames">Next 2 Days Games</button>
+      <button class="clear-btn" id="tabTeamGameNews">Teams Games News</button>
+      <button class="clear-btn" id="tabNews">Caught News</button>
+      <button class="clear-btn" id="tabPlayers">Player Importance DB</button>
+      <button class="clear-btn" id="tabTransitions">Transition Scores</button>
+      <span class="status-pill connected" id="serverStatus">Connecting...</span>
+      <span class="last-report" id="lastReport">Last report: loading...</span>
+    </div>
+
+    <section id="injuriesTab">
+      <div class="controls">
+        <input type="text" id="searchPlayer" placeholder="Search player...">
+        <select id="filterStatus">
+          <option value="">All Statuses</option>
+          <option value="Out">Out</option>
+          <option value="Doubtful">Doubtful</option>
+          <option value="Questionable">Questionable</option>
+          <option value="Probable">Probable</option>
+          <option value="Available">Available</option>
+        </select>
+        <select id="filterTeam">
+          <option value="">All Teams</option>
+        </select>
+      </div>
+
+      <div id="tableContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          Fetching latest injury report...
+        </div>
+      </div>
+    </section>
+
+    <section id="gamesTab" style="display:none">
+      <div id="gamesContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          Loading upcoming NBA games...
+        </div>
+      </div>
+    </section>
+
+    <section id="teamGameNewsTab" style="display:none">
+      <div id="teamGameNewsContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          Building team game news batches...
+        </div>
+      </div>
+    </section>
+
+    <section id="playersTab" style="display:none">
+      <div class="controls">
+        <div class="search-wrap">
+          <input type="text" id="dbSearchPlayer" placeholder="Search DB player...">
+          <div class="suggestions" id="dbPlayerSuggestions"></div>
+        </div>
+        <div class="multi-select">
+          <button class="filter-button" id="dbTeamFilterButton" type="button">Teams: All</button>
+          <div class="filter-menu" id="dbTeamFilterMenu"></div>
+        </div>
+        <div class="multi-select">
+          <button class="filter-button" id="dbImportanceFilterButton" type="button">Importance: All</button>
+          <div class="filter-menu" id="dbImportanceFilterMenu">
+            <div class="range-filter-header">
+              <span>Importance range</span>
+              <span class="range-filter-value" id="dbImportanceRangeValue">All</span>
+            </div>
+            <div class="range-sliders">
+              <div class="range-row">
+                <span class="range-row-label">From</span>
+                <input type="range" id="dbImportanceMin" min="0" max="10" step="1" value="0">
+                <span class="range-row-value" id="dbImportanceMinValue">0</span>
+              </div>
+              <div class="range-row">
+                <span class="range-row-label">To</span>
+                <input type="range" id="dbImportanceMax" min="0" max="10" step="1" value="10">
+                <span class="range-row-value" id="dbImportanceMaxValue">10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <select id="dbSortBy">
+          <option value="importance_desc">Sort: Importance high to low</option>
+          <option value="importance_asc">Sort: Importance low to high</option>
+          <option value="team_asc">Sort: Team A-Z</option>
+          <option value="player_asc">Sort: Player A-Z</option>
+        </select>
+      </div>
+
+      <div class="controls" style="background:#fff;border:1px solid var(--border);padding:16px;border-radius:12px;">
+        <input type="text" id="addPlayerName" placeholder="Player name">
+        <input type="text" id="addPlayerTeam" placeholder="NBA team">
+        <input type="number" id="addPlayerImportance" placeholder="Importance" min="0" max="10" style="width:140px">
+        <button class="clear-btn" id="addPlayerBtn">Add / Update Player</button>
+      </div>
+
+      <div id="playersDbContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          Loading player importance database...
+        </div>
+      </div>
+    </section>
+
+    <section id="transitionsTab" style="display:none">
+      <p class="count-label">Edit the transition scores directly in the grids below. Values are config only for now and must stay between <strong>-100</strong> and <strong>100</strong>.</p>
+
+      <div id="transitionsContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          Loading transition score configuration...
+        </div>
+      </div>
+    </section>
+
+    <section id="newsTab" style="display:none">
+      <div class="controls">
+        <input type="text" id="newsSearchPlayer" placeholder="Search caught news...">
+        <select id="newsTypeFilter">
+          <option value="">All News Types</option>
+          <option value="added">Added</option>
+          <option value="removed">Removed</option>
+          <option value="status_change">Status Change</option>
+          <option value="injury_change">Injury Change</option>
+        </select>
+        <div class="multi-select">
+          <button class="filter-button" id="newsDateFilterButton" type="button">Caught At: All</button>
+          <div class="filter-menu" id="newsDateFilterMenu">
+            <div class="range-filter-header">
+              <span>Caught at range</span>
+              <span class="range-filter-value" id="newsDateRangeValue">All</span>
+            </div>
+            <div class="range-sliders">
+              <div class="range-row date-range-row">
+                <span class="range-row-label">From</span>
+                <input type="range" id="newsDateMin" min="0" max="0" step="1" value="0">
+                <span class="range-row-value date-range-value" id="newsDateMinValue">All</span>
+              </div>
+              <div class="range-row date-range-row">
+                <span class="range-row-label">To</span>
+                <input type="range" id="newsDateMax" min="0" max="0" step="1" value="0">
+                <span class="range-row-value date-range-value" id="newsDateMaxValue">All</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="multi-select">
+          <button class="filter-button" id="newsImportanceFilterButton" type="button">Player Importance: All</button>
+          <div class="filter-menu" id="newsImportanceFilterMenu">
+            <div class="range-filter-header">
+              <span>Player importance range</span>
+              <span class="range-filter-value" id="newsImportanceRangeValue">All</span>
+            </div>
+            <div class="range-sliders">
+              <div class="range-row">
+                <span class="range-row-label">From</span>
+                <input type="range" id="newsImportanceMin" min="0" max="10" step="1" value="0">
+                <span class="range-row-value" id="newsImportanceMinValue">0</span>
+              </div>
+              <div class="range-row">
+                <span class="range-row-label">To</span>
+                <input type="range" id="newsImportanceMax" min="0" max="10" step="1" value="10">
+                <span class="range-row-value" id="newsImportanceMaxValue">10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="multi-select">
+          <button class="filter-button" id="newsScoreFilterButton" type="button">Score Abs: All</button>
+          <div class="filter-menu" id="newsScoreFilterMenu">
+            <div class="range-filter-header">
+              <span>Absolute score range</span>
+              <span class="range-filter-value" id="newsScoreRangeValue">All</span>
+            </div>
+            <div class="range-sliders">
+              <div class="range-row">
+                <span class="range-row-label">From</span>
+                <input type="range" id="newsScoreMin" min="0" max="100" step="0.01" value="0">
+                <span class="range-row-value" id="newsScoreMinValue">0</span>
+              </div>
+              <div class="range-row">
+                <span class="range-row-label">To</span>
+                <input type="range" id="newsScoreMax" min="0" max="100" step="0.01" value="100">
+                <span class="range-row-value" id="newsScoreMaxValue">100</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="clear-btn" id="clearNewsBtn">Clear News Log</button>
+      </div>
+
+      <div id="newsTableContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          Loading caught news...
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>Notifications</h2>
+      <span class="notif-badge" id="notifCount">0</span>
+    </div>
+    <button class="clear-btn" id="clearBtn" onclick="clearNotifications()">Clear all</button>
+    <div class="notif-list" id="notifList">
+      <div class="empty-state">Watching for changes...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let allRecords = [];
+let playersDb = [];
+let newsRows = [];
+let notificationsData = [];
+let transitionConfigs = [];
+let upcomingGames = [];
+let expandedTeamGameNewsKeys = new Set();
+let injurySortCol = 'team';
+let injurySortDir = 1;
+let activeTab = 'injuries';
+let selectedDbTeams = new Set();
+let dbImportanceMin = 0;
+let dbImportanceMax = 10;
+let dbImportanceBounds = { min: 0, max: 10 };
+let newsDateOptions = [];
+let newsDateMinIndex = 0;
+let newsDateMaxIndex = 0;
+let newsImportanceMin = 0;
+let newsImportanceMax = 10;
+let newsImportanceBounds = { min: 0, max: 10 };
+let newsScoreMin = 0;
+let newsScoreMax = 100;
+let newsScoreBounds = { min: 0, max: 100 };
+
+const ICON_MAP = { added: '+', removed: '−', status_change: '~', injury_change: 'i' };
+const TRANSITION_TYPE_LABELS = {
+  added: 'Added',
+  status_change: 'Status Change',
+  removed: 'Removed',
+};
+const TRANSITION_STATUS_ORDER = ['Out', 'Doubtful', 'Questionable', 'Probable', 'Available'];
+const TEAM_TRICODE_MAP = {
+  'Atlanta Hawks': 'ATL',
+  'Boston Celtics': 'BOS',
+  'Brooklyn Nets': 'BKN',
+  'Charlotte Hornets': 'CHA',
+  'Chicago Bulls': 'CHI',
+  'Cleveland Cavaliers': 'CLE',
+  'Dallas Mavericks': 'DAL',
+  'Denver Nuggets': 'DEN',
+  'Detroit Pistons': 'DET',
+  'Golden State Warriors': 'GSW',
+  'Houston Rockets': 'HOU',
+  'Indiana Pacers': 'IND',
+  'LA Clippers': 'LAC',
+  'Los Angeles Clippers': 'LAC',
+  'Los Angeles Lakers': 'LAL',
+  'Memphis Grizzlies': 'MEM',
+  'Miami Heat': 'MIA',
+  'Milwaukee Bucks': 'MIL',
+  'Minnesota Timberwolves': 'MIN',
+  'New Orleans Pelicans': 'NOP',
+  'New York Knicks': 'NYK',
+  'Oklahoma City Thunder': 'OKC',
+  'Orlando Magic': 'ORL',
+  'Philadelphia 76ers': 'PHI',
+  'Phoenix Suns': 'PHX',
+  'Portland Trail Blazers': 'POR',
+  'Sacramento Kings': 'SAC',
+  'San Antonio Spurs': 'SAS',
+  'Toronto Raptors': 'TOR',
+  'Utah Jazz': 'UTA',
+  'Washington Wizards': 'WAS',
+};
+const TEAM_COLOR_MAP = {
+  ATL: '#E03A3E',
+  BOS: '#007A33',
+  BKN: '#000000',
+  CHA: '#1D1160',
+  CHI: '#CE1141',
+  CLE: '#860038',
+  DAL: '#00538C',
+  DEN: '#0E2240',
+  DET: '#C8102E',
+  GSW: '#1D428A',
+  HOU: '#CE1141',
+  IND: '#002D62',
+  LAC: '#C8102E',
+  LAL: '#C69214',
+  MEM: '#5D76A9',
+  MIA: '#98002E',
+  MIL: '#00471B',
+  MIN: '#0C2340',
+  NOP: '#0C2340',
+  NYK: '#F58426',
+  OKC: '#007AC1',
+  ORL: '#0077C0',
+  PHI: '#006BB6',
+  PHX: '#1D1160',
+  POR: '#E03A3E',
+  SAC: '#5A2D81',
+  SAS: '#C4CED4',
+  TOR: '#CE1141',
+  UTA: '#002B5C',
+  WAS: '#002B5C',
+};
+
+function statusClass(s) {
+  return 'badge-' + s.toLowerCase().replace(/\s+/g, '');
+}
+
+function formatLocalDateTime(value) {
+  if (!value) return '';
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return value;
+  return dt.toLocaleString([], {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function formatShortDateTime(value) {
+  if (!value) return '';
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return value;
+  return dt.toLocaleString([], {
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function timeValue(value) {
+  const dt = new Date(value);
+  return Number.isNaN(dt.getTime()) ? null : dt.getTime();
+}
+
+function findLastMatchingIndex(values, predicate) {
+  for (let i = values.length - 1; i >= 0; i -= 1) {
+    if (predicate(values[i], i)) return i;
+  }
+  return -1;
+}
+
+function formatIntervalLabel(seconds) {
+  const safeSeconds = Number(seconds);
+  if (!Number.isFinite(safeSeconds) || safeSeconds <= 0) return '';
+  if (safeSeconds % 60 === 0) return `${safeSeconds / 60}m`;
+  return `${safeSeconds}s`;
+}
+
+function normalizePlayerNameTokens(value) {
+  return String(value || '').toLowerCase().replace(/[''`.]/g, '').split(/[\s,\-]+/).filter(t => /^[a-z0-9]+$/.test(t));
+}
+
+function playerNameLookupKeys(value) {
+  const raw = String(value || '').trim();
+  const tokens = normalizePlayerNameTokens(raw);
+  if (!tokens.length) return [];
+  const keys = new Set();
+  keys.add(tokens.join(' '));
+  keys.add([...tokens].sort().join(' '));
+  if (raw.includes(',')) {
+    const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      const reordered = normalizePlayerNameTokens(parts.slice(1).join(' ') + ' ' + parts[0]);
+      keys.add(reordered.join(' '));
+      keys.add([...reordered].sort().join(' '));
+    }
+  }
+  return [...keys];
+}
+
+function getPlayerImportanceMap() {
+  const map = new Map();
+  for (const row of playersDb) {
+    const importance = Number(row.importance) || 0;
+    for (const key of playerNameLookupKeys(row.player_name)) {
+      const existing = map.get(key) ?? 0;
+      if (importance > existing) map.set(key, importance);
+    }
+  }
+  return map;
+}
+
+function getTransitionScoreMap() {
+  const map = new Map();
+  for (const row of transitionConfigs) {
+    map.set(transitionRowKey(row.transition_type, row.from_state, row.to_state), Number(row.score) || 0);
+  }
+  return map;
+}
+
+function transitionStatesForRow(row) {
+  if (row.type === 'added') {
+    return {
+      transition_type: 'added',
+      from_state: row.from_status || 'Not On Report',
+      to_state: row.to_status || row.status || '',
+    };
+  }
+  if (row.type === 'removed') {
+    return {
+      transition_type: 'removed',
+      from_state: row.from_status || row.status || '',
+      to_state: row.to_status || 'Removed',
+    };
+  }
+  if (row.type === 'status_change') {
+    return {
+      transition_type: 'status_change',
+      from_state: row.from_status || '',
+      to_state: row.to_status || row.status || '',
+    };
+  }
+  return {
+    transition_type: row.type || '',
+    from_state: row.from_status || '',
+    to_state: row.to_status || '',
+  };
+}
+
+function normalizeScore(score) {
+  if (!Number.isFinite(score) || Math.abs(score) < 0.005) return 0;
+  return Math.round(score * 100) / 100;
+}
+
+function formatScore(score) {
+  const normalized = normalizeScore(Number(score));
+  if (!normalized) return '0';
+  return normalized.toFixed(2).replace(/\.?0+$/, '');
+}
+
+function scoreClass(score) {
+  const normalized = normalizeScore(Number(score));
+  if (normalized > 0) return 'score-positive';
+  if (normalized < 0) return 'score-negative';
+  return 'score-neutral';
+}
+
+function decorateScoredRows(rows) {
+  const importanceMap = getPlayerImportanceMap();
+  const transitionScoreMap = getTransitionScoreMap();
+  return rows.map(row => {
+    const lookupKeys = playerNameLookupKeys(row.player);
+    let playerImportance = 0;
+    for (const key of lookupKeys) {
+      const val = importanceMap.get(key) ?? 0;
+      if (val > playerImportance) playerImportance = val;
+    }
+    const transition = transitionStatesForRow(row);
+    const transitionScore = transitionScoreMap.get(
+      transitionRowKey(transition.transition_type, transition.from_state, transition.to_state)
+    ) ?? 0;
+    const score = row.type === 'injury_change' || !playerImportance
+      ? 0
+      : normalizeScore((playerImportance * playerImportance * transitionScore) / 100);
+
+    return {
+      ...row,
+      player_importance: playerImportance,
+      probability_change: transitionScore,
+      score,
+      abs_score: Math.abs(score),
+    };
+  });
+}
+
+function formatLocalGameTime(value) {
+  if (!value) return '';
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return value;
+  return dt.toLocaleString([], {
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function teamColor(tricode) {
+  return TEAM_COLOR_MAP[String(tricode || '').toUpperCase()] || 'inherit';
+}
+
+function renderColoredTeamCode(tricode) {
+  const code = String(tricode || '').trim();
+  if (!code) return '';
+  return `<span style="color:${teamColor(code)};font-weight:700">${escapeHtml(code)}</span>`;
+}
+
+function renderColoredMatchup(awayTricode, homeTricode, fallback = '') {
+  const away = String(awayTricode || '').trim();
+  const home = String(homeTricode || '').trim();
+  if (away && home) {
+    return `${renderColoredTeamCode(away)} <span style="color:var(--muted)">@</span> ${renderColoredTeamCode(home)}`;
+  }
+  return `<span>${escapeHtml(fallback)}</span>`;
+}
+
+function renderImpactValue(tricode, value) {
+  const code = String(tricode || '').trim();
+  if (!code) return escapeHtml(formatScore(value));
+  return `${renderColoredTeamCode(code)} <span style="color:${teamColor(code)};font-weight:600">${escapeHtml(formatScore(value))}</span>`;
+}
+
+function renderEdgeValue(row) {
+  if (!row.edge_score) return '<span style="color:var(--muted)">Even</span>';
+  const leader = row.edge_score > 0 ? row.home_tricode : row.away_tricode;
+  const sideLabel = row.edge_score > 0 ? 'Home edge' : 'Away edge';
+  return `<span style="color:${teamColor(leader)};font-weight:700">${escapeHtml(sideLabel)}: ${escapeHtml(leader)} +${escapeHtml(formatScore(Math.abs(row.edge_score)))}</span>`;
+}
+
+function formatAffectedGame(row) {
+  const matchup = String(row.scheduled_matchup || '').trim();
+  const gameTime = formatLocalGameTime(row.scheduled_game_datetime || '');
+  if (matchup && gameTime) return `${matchup} | ${gameTime}`;
+  if (matchup) return matchup;
+  return '';
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function setActiveTab(tab) {
+  activeTab = tab;
+  document.getElementById('injuriesTab').style.display = tab === 'injuries' ? '' : 'none';
+  document.getElementById('gamesTab').style.display = tab === 'games' ? '' : 'none';
+  document.getElementById('teamGameNewsTab').style.display = tab === 'teamGameNews' ? '' : 'none';
+  document.getElementById('playersTab').style.display = tab === 'players' ? '' : 'none';
+  document.getElementById('transitionsTab').style.display = tab === 'transitions' ? '' : 'none';
+  document.getElementById('newsTab').style.display = tab === 'news' ? '' : 'none';
+  document.getElementById('tabInjuries').style.background = tab === 'injuries' ? '#eef2ff' : '';
+  document.getElementById('tabInjuries').style.color = tab === 'injuries' ? '#4338ca' : '';
+  document.getElementById('tabGames').style.background = tab === 'games' ? '#eef2ff' : '';
+  document.getElementById('tabGames').style.color = tab === 'games' ? '#4338ca' : '';
+  document.getElementById('tabTeamGameNews').style.background = tab === 'teamGameNews' ? '#eef2ff' : '';
+  document.getElementById('tabTeamGameNews').style.color = tab === 'teamGameNews' ? '#4338ca' : '';
+  document.getElementById('tabNews').style.background = tab === 'news' ? '#eef2ff' : '';
+  document.getElementById('tabNews').style.color = tab === 'news' ? '#4338ca' : '';
+  document.getElementById('tabPlayers').style.background = tab === 'players' ? '#eef2ff' : '';
+  document.getElementById('tabPlayers').style.color = tab === 'players' ? '#4338ca' : '';
+  document.getElementById('tabTransitions').style.background = tab === 'transitions' ? '#eef2ff' : '';
+  document.getElementById('tabTransitions').style.color = tab === 'transitions' ? '#4338ca' : '';
+}
+
+function closeDbMenus(exceptId = null) {
+  for (const id of ['dbTeamFilterMenu', 'dbImportanceFilterMenu', 'newsDateFilterMenu', 'newsImportanceFilterMenu', 'newsScoreFilterMenu']) {
+    if (id === exceptId) continue;
+    const menu = document.getElementById(id);
+    if (menu) {
+      menu.classList.remove('open');
+    }
+  }
+}
+
+function toggleDbMenu(menuId) {
+  const menu = document.getElementById(menuId);
+  const willOpen = !menu.classList.contains('open');
+  closeDbMenus(menuId);
+  if (willOpen) menu.classList.add('open');
+}
+
+function renderStatus(status) {
+  const el = document.getElementById('serverStatus');
+  if (!status) {
+    el.className = 'status-pill disconnected';
+    el.textContent = 'Disconnected';
+    return;
+  }
+
+  const nextTarget = formatLocalDateTime(status.next_target_at);
+  if (status.poll_mode === 'aggressive') {
+    el.className = 'status-pill aggressive';
+    el.textContent = `Aggressive mode (${formatIntervalLabel(status.aggressive_interval_seconds) || '1s'})`;
+  } else {
+    el.className = 'status-pill normal';
+    el.textContent = `Normal polling (${formatIntervalLabel(status.baseline_interval_seconds) || '2m'})`;
+  }
+  el.title = `Next target report: ${nextTarget}`;
+}
+
+function renderInjuryTable(records) {
+  if (!records.length) {
+    document.getElementById('tableContainer').innerHTML =
+      '<div class="empty-state">No matching players found.</div>';
+    return;
+  }
+
+  let html = `<p class="count-label">Showing <strong>${records.length}</strong> of <strong>${allRecords.length}</strong> player(s)</p>`;
+  html += '<table><thead><tr>';
+
+  const cols = [
+    { key: 'team', label: 'Team' },
+    { key: 'game_datetime_et', label: 'Game Time' },
+    { key: 'matchup', label: 'Matchup' },
+    { key: 'player', label: 'Player' },
+    { key: 'status', label: 'Status' },
+    { key: 'injury', label: 'Injury' },
+    { key: 'last_update_at', label: 'Last Update' },
+  ];
+
+  for (const c of cols) {
+    const sorted = injurySortCol === c.key;
+    const arrow = sorted ? (injurySortDir === 1 ? '▲' : '▼') : '▲';
+    html += `<th class="${sorted ? 'sorted' : ''}" onclick="doInjurySort('${c.key}')">${c.label}<span class="sort-icon">${arrow}</span></th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const r of records) {
+    html += `<tr>
+      <td>${escapeHtml(r.team)}</td>
+      <td>${escapeHtml(formatLocalGameTime(r.game_datetime_et) || r.game_time)}</td>
+      <td>${escapeHtml(r.matchup)}</td>
+      <td><strong>${escapeHtml(r.player)}</strong></td>
+      <td><span class="badge ${statusClass(r.status)}">${escapeHtml(r.status)}</span></td>
+      <td>${escapeHtml(r.injury)}</td>
+      <td>${escapeHtml(formatLocalDateTime(r.last_update_at))}</td>
+    </tr>`;
+  }
+
+  html += '</tbody></table>';
+  document.getElementById('tableContainer').innerHTML = html;
+}
+
+function buildPolymarketSlug(game) {
+  const away = (game.away_tricode || '').trim().toLowerCase();
+  const home = (game.home_tricode || '').trim().toLowerCase();
+  if (!away || !home || !game.game_datetime) return '';
+  const dateMatch = String(game.game_datetime).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!dateMatch) return '';
+  return `nba-${away}-${home}-${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+}
+
+function buildPolymarketGameUrl(game) {
+  const slug = buildPolymarketSlug(game);
+  return slug ? `https://polymarket.com/sports/nba/${slug}` : '';
+}
+
+const polymarketCache = new Map();
+
+async function fetchPolymarketOdds(slug) {
+  if (polymarketCache.has(slug)) return polymarketCache.get(slug);
+  const res = await fetch(`/api/polymarket-game?slug=${encodeURIComponent(slug)}`);
+  if (!res.ok) throw new Error(`${res.status}`);
+  const data = await res.json();
+  polymarketCache.set(slug, data);
+  return data;
+}
+
+function pctLabel(price) {
+  return (parseFloat(price) * 100).toFixed(1) + '%';
+}
+
+function oddsBarHtml(outcomes, prices, highlight) {
+  const pct1 = parseFloat(prices[0] || 0) * 100;
+  const pct2 = parseFloat(prices[1] || 0) * 100;
+  const label1 = escapeHtml(outcomes[0] || '?');
+  const label2 = escapeHtml(outcomes[1] || '?');
+  const green = '#16a34a';
+  const red = '#dc2626';
+  const leftColor = pct1 >= pct2 ? green : red;
+  const rightColor = pct2 >= pct1 ? green : red;
+  return `<div style="display:flex;align-items:center;gap:6px;font-size:13px;min-width:320px">
+    <span style="width:90px;text-align:right;font-weight:600">${label1}</span>
+    <div style="flex:1;display:flex;height:22px;border-radius:4px;overflow:hidden;background:#e5e7eb">
+      <div style="width:${pct1.toFixed(1)}%;background:${leftColor};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:36px">${pct1.toFixed(1)}%</div>
+      <div style="width:${pct2.toFixed(1)}%;background:${rightColor};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:36px">${pct2.toFixed(1)}%</div>
+    </div>
+    <span style="width:90px;font-weight:600">${label2}</span>
+  </div>`;
+}
+
+function renderOddsPanel(data, polyUrl) {
+  const moneyline = data.markets.filter(m => m.type === 'moneyline');
+  const spreads = data.markets.filter(m => m.type === 'spreads');
+  const totals = data.markets.filter(m => m.type === 'totals');
+  const h1Money = data.markets.filter(m => m.type === 'first_half_moneyline');
+  const h1Spreads = data.markets.filter(m => m.type === 'first_half_spreads');
+  const h1Totals = data.markets.filter(m => m.type === 'first_half_totals');
+
+  let html = '<div style="padding:12px 16px;background:#f8fafc;border-top:1px solid #e2e8f0">';
+
+  function section(title, markets) {
+    if (!markets.length) return '';
+    let s = `<div style="margin-bottom:12px"><div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#334155">${title}</div>`;
+    for (const m of markets) {
+      const label = m.groupItemTitle || m.question || '';
+      s += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="min-width:140px;font-size:12px;color:#64748b">${escapeHtml(label)}</span>
+        ${oddsBarHtml(m.outcomes, m.prices)}
+      </div>`;
+    }
+    s += '</div>';
+    return s;
+  }
+
+  html += section('Moneyline', moneyline);
+  html += section('Spreads', spreads);
+  html += section('Totals (O/U)', totals);
+  html += section('1st Half Moneyline', h1Money);
+  html += section('1st Half Spreads', h1Spreads);
+  html += section('1st Half Totals', h1Totals);
+
+  if (polyUrl) {
+    html += `<div style="margin-top:4px"><a href="${escapeHtml(polyUrl)}" target="_blank" rel="noopener" style="font-size:12px;color:#4338ca">View all markets on Polymarket →</a></div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+async function toggleOddsRow(btn, slug, polyUrl, colSpan) {
+  const tr = btn.closest('tr');
+  const existing = tr.nextElementSibling;
+  if (existing && existing.classList.contains('odds-detail-row')) {
+    existing.remove();
+    btn.textContent = '📈 Odds';
+    return;
+  }
+  btn.textContent = '⏳ ...';
+  try {
+    const data = await fetchPolymarketOdds(slug);
+    const detailTr = document.createElement('tr');
+    detailTr.className = 'odds-detail-row';
+    const td = document.createElement('td');
+    td.colSpan = colSpan;
+    td.innerHTML = renderOddsPanel(data, polyUrl);
+    detailTr.appendChild(td);
+    tr.after(detailTr);
+    btn.textContent = '📈 Hide';
+  } catch (e) {
+    btn.textContent = '❌ Error';
+    console.error('polymarket fetch error', e);
+  }
+}
+
+function renderUpcomingGames(rows) {
+  if (!rows.length) {
+    document.getElementById('gamesContainer').innerHTML =
+      '<div class="empty-state">No NBA games scheduled in the next 2 days.</div>';
+    return;
+  }
+
+  let html = `<p class="count-label">Showing <strong>${rows.length}</strong> upcoming NBA game(s) in the next <strong>2</strong> days</p>`;
+  html += '<table><thead><tr><th>Start</th><th>Matchup</th><th>Away</th><th>Home</th><th>Arena</th><th>Status</th><th>TV</th><th>Polymarket</th></tr></thead><tbody>';
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const arenaParts = [row.arena || '', row.arena_city || '', row.arena_state || '']
+      .filter(Boolean)
+      .join(', ');
+    const slug = buildPolymarketSlug(row);
+    const polyUrl = slug ? `https://polymarket.com/sports/nba/${slug}` : '';
+    const polyCell = slug
+      ? `<button onclick="toggleOddsRow(this,'${slug}','${escapeHtml(polyUrl)}',8)" style="background:#4338ca;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap">📈 Odds</button>`
+      : '';
+    html += `<tr>
+      <td>${escapeHtml(formatLocalDateTime(row.game_datetime))}</td>
+      <td><strong>${escapeHtml(row.matchup || '')}</strong></td>
+      <td>${escapeHtml(row.away_team || '')}</td>
+      <td>${escapeHtml(row.home_team || '')}</td>
+      <td>${escapeHtml(arenaParts)}</td>
+      <td>${escapeHtml(row.status || '')}</td>
+      <td>${escapeHtml(row.broadcast || 'League Pass / Local')}</td>
+      <td>${polyCell}</td>
+    </tr>`;
+  }
+
+  html += '</tbody></table>';
+  document.getElementById('gamesContainer').innerHTML = html;
+}
+
+function parseMatchupTeams(matchup) {
+  const codes = String(matchup || '').match(/\b[A-Z]{2,4}\b/g) || [];
+  return {
+    away: codes[0] || '',
+    home: codes[1] || '',
+  };
+}
+
+function floorToBatchMs(value, batchMs = 5000) {
+  return Math.floor(value / batchMs) * batchMs;
+}
+
+function canonicalUpcomingGameKey(game) {
+  if (game.game_id) return `id:${game.game_id}`;
+  if (game.game_datetime && game.matchup) return `slot:${game.game_datetime}|${game.matchup}`;
+  return '';
+}
+
+function canonicalNewsGameKey(row) {
+  if (row.game_id) return `id:${row.game_id}`;
+  if (row.scheduled_game_datetime && row.scheduled_matchup) {
+    return `slot:${row.scheduled_game_datetime}|${row.scheduled_matchup}`;
+  }
+  return '';
+}
+
+function creditedTeamForRow(row) {
+  const ownTeam = String(row.team_tricode || '');
+  const opponentTeam = String(row.opponent_tricode || '');
+  if (!ownTeam || !opponentTeam || !row.score) {
+    return '';
+  }
+  if (row.score > 0) return ownTeam;
+  if (row.score < 0) return opponentTeam;
+  return '';
+}
+
+function beneficiaryLabelForRow(item, group) {
+  if (!item.credited_team) return 'None';
+  if (item.credited_team === group.away_tricode) return `Away (${item.credited_team})`;
+  if (item.credited_team === group.home_tricode) return `Home (${item.credited_team})`;
+  return item.credited_team;
+}
+
+function renderBeneficiaryLabel(item, group) {
+  const label = beneficiaryLabelForRow(item, group);
+  if (!item.credited_team) return escapeHtml(label);
+  return `<span style="color:${teamColor(item.credited_team)};font-weight:600">${escapeHtml(label)}</span>`;
+}
+
+function buildTeamGameNewsRows() {
+  const nowMs = Date.now();
+  const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
+  const grouped = new Map();
+  const validGameKeys = new Set(
+    upcomingGames
+      .map(game => canonicalUpcomingGameKey(game))
+      .filter(Boolean)
+  );
+
+  for (const row of decorateScoredRows(newsRows)) {
+    const gameKey = canonicalNewsGameKey(row);
+    if (!gameKey || !validGameKeys.has(gameKey)) continue;
+
+    const gameTimeMs = timeValue(row.scheduled_game_datetime || row.game_datetime_et);
+    if (gameTimeMs === null) continue;
+    if (gameTimeMs < nowMs || gameTimeMs > nowMs + twoDaysMs) continue;
+    if (!row.away_tricode || !row.home_tricode || !row.team_tricode || !row.opponent_tricode) continue;
+
+    const bucketTimeMs = floorToBatchMs(timeValue(row.timestamp_at) || nowMs);
+    const batchKey = `${bucketTimeMs}|${gameKey}`;
+    if (!grouped.has(batchKey)) {
+      grouped.set(batchKey, {
+        key: batchKey,
+        game_id: row.game_id || '',
+        batch_time: new Date(bucketTimeMs).toISOString(),
+        game_datetime_et: row.scheduled_game_datetime || row.game_datetime_et,
+        matchup: row.scheduled_matchup || row.matchup || '',
+        away_tricode: row.away_tricode || '',
+        home_tricode: row.home_tricode || '',
+        away_score: 0,
+        home_score: 0,
+        items: [],
+      });
+    }
+
+    const group = grouped.get(batchKey);
+    const creditedTeam = creditedTeamForRow(row);
+    const impactValue = Math.abs(Number(row.score) || 0);
+    if (creditedTeam && impactValue) {
+      if (creditedTeam === group.away_tricode) group.away_score = normalizeScore(group.away_score + impactValue);
+      if (creditedTeam === group.home_tricode) group.home_score = normalizeScore(group.home_score + impactValue);
+    }
+
+    group.items.push({
+      ...row,
+      credited_team: creditedTeam,
+      impact_value: normalizeScore(impactValue),
+    });
+  }
+
+  return [...grouped.values()]
+    .map(group => {
+      const edgeScore = normalizeScore(group.home_score - group.away_score);
+      return {
+        ...group,
+        away_score: normalizeScore(group.away_score),
+        home_score: normalizeScore(group.home_score),
+        edge_score: edgeScore,
+      };
+    })
+    .sort((a, b) => {
+      const batchDiff = (timeValue(b.batch_time) || 0) - (timeValue(a.batch_time) || 0);
+      if (batchDiff !== 0) return batchDiff;
+      return (timeValue(a.game_datetime_et) || 0) - (timeValue(b.game_datetime_et) || 0);
+    });
+}
+
+function toggleTeamGameNewsDetails(key) {
+  if (expandedTeamGameNewsKeys.has(key)) expandedTeamGameNewsKeys.delete(key);
+  else expandedTeamGameNewsKeys.add(key);
+  renderTeamGameNews();
+}
+
+function renderTeamGameNews() {
+  const rows = buildTeamGameNewsRows();
+  if (!rows.length) {
+    document.getElementById('teamGameNewsContainer').innerHTML =
+      '<div class="empty-state">No batch game scores for games in the next 2 days yet.</div>';
+    return;
+  }
+
+  let html = `<div class="game-news-summary">Showing <strong>${rows.length}</strong> batch game score row(s) for games in the next <strong>2</strong> days.</div>`;
+  html += '<table><thead><tr><th>Batch Time</th><th>Game Time</th><th>Matchup</th><th>Away Impact</th><th>Home Impact</th><th>Edge</th><th>Details</th></tr></thead><tbody>';
+
+  for (const row of rows) {
+    const isOpen = expandedTeamGameNewsKeys.has(row.key);
+    html += `<tr>
+      <td>${escapeHtml(formatLocalDateTime(row.batch_time))}</td>
+      <td>${escapeHtml(formatLocalDateTime(row.game_datetime_et))}</td>
+      <td><strong>${renderColoredMatchup(row.away_tricode, row.home_tricode, row.matchup || '')}</strong></td>
+      <td>${renderImpactValue(row.away_tricode, row.away_score)}</td>
+      <td>${renderImpactValue(row.home_tricode, row.home_score)}</td>
+      <td>${renderEdgeValue(row)}</td>
+      <td><button class="details-btn" onclick='toggleTeamGameNewsDetails(${JSON.stringify(row.key)})'>${isOpen ? 'Hide' : 'View'}</button></td>
+    </tr>`;
+
+    if (isOpen) {
+      html += `<tr class="details-row"><td colspan="7"><div class="details-panel">
+        <div class="details-panel-title">Batch details for ${renderColoredMatchup(row.away_tricode, row.home_tricode, row.matchup || '')}</div>
+        <div style="margin:0 0 10px 0;color:var(--muted)">Scheduled game time: ${escapeHtml(formatLocalDateTime(row.game_datetime_et))}</div>
+        <table class="details-table">
+          <thead><tr><th>Player</th><th>Team</th><th>News</th><th>Importance</th><th>Transition</th><th>Signed Score</th><th>Beneficiary</th></tr></thead>
+          <tbody>`;
+      for (const item of row.items) {
+        html += `<tr>
+          <td><strong>${escapeHtml(item.player || '')}</strong></td>
+          <td>${escapeHtml(item.team || '')}</td>
+          <td>${escapeHtml(item.detail || '')}</td>
+          <td>${escapeHtml(item.player_importance ?? 0)}</td>
+          <td>${escapeHtml(`${item.from_status || ''} -> ${item.to_status || ''}`)}</td>
+          <td class="${scoreClass(item.score)}">${escapeHtml(formatScore(item.score))}</td>
+          <td>${renderBeneficiaryLabel(item, row)}</td>
+        </tr>`;
+      }
+      html += '</tbody></table></div></td></tr>';
+    }
+  }
+
+  html += '</tbody></table>';
+  document.getElementById('teamGameNewsContainer').innerHTML = html;
+}
+
+function doInjurySort(col) {
+  if (injurySortCol === col) {
+    injurySortDir *= -1;
+  } else {
+    injurySortCol = col;
+    injurySortDir = 1;
+  }
+  applyInjuryFilters();
+}
+
+function applyInjuryFilters() {
+  const search = document.getElementById('searchPlayer').value.toLowerCase();
+  const status = document.getElementById('filterStatus').value;
+  const team = document.getElementById('filterTeam').value;
+
+  let filtered = allRecords.filter(r => {
+    if (search && !r.player.toLowerCase().includes(search)) return false;
+    if (status && r.status !== status) return false;
+    if (team && r.team !== team) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    const av = String(a[injurySortCol] || '').toLowerCase();
+    const bv = String(b[injurySortCol] || '').toLowerCase();
+    if (av < bv) return -1 * injurySortDir;
+    if (av > bv) return 1 * injurySortDir;
+    return 0;
+  });
+
+  renderInjuryTable(filtered);
+}
+
+function populateInjuryTeams(records) {
+  const teams = [...new Set(records.map(r => r.team))].sort();
+  const sel = document.getElementById('filterTeam');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All Teams</option>';
+  for (const t of teams) {
+    sel.innerHTML += `<option value="${escapeHtml(t)}" ${t === current ? 'selected' : ''}>${escapeHtml(t)}</option>`;
+  }
+}
+
+function updateDbFilterButtons() {
+  const teamBtn = document.getElementById('dbTeamFilterButton');
+  const impBtn = document.getElementById('dbImportanceFilterButton');
+
+  teamBtn.textContent = selectedDbTeams.size ? `Teams: ${selectedDbTeams.size} selected` : 'Teams: All';
+  const usingFullRange = dbImportanceMin === dbImportanceBounds.min && dbImportanceMax === dbImportanceBounds.max;
+  impBtn.textContent = usingFullRange ? 'Importance: All' : `Importance: ${dbImportanceMin} - ${dbImportanceMax}`;
+
+  teamBtn.classList.toggle('active', selectedDbTeams.size > 0);
+  impBtn.classList.toggle('active', !usingFullRange);
+}
+
+function renderDbTeamFilter(records) {
+  const teams = [...new Set(records.map(r => r.nba_team))].sort();
+  const menu = document.getElementById('dbTeamFilterMenu');
+  let html = `
+    <div class="filter-actions">
+      <button class="clear-btn" type="button" onclick="selectAllDbTeams()">All</button>
+      <button class="clear-btn" type="button" onclick="clearAllDbTeams()">Clear</button>
+    </div>
+  `;
+  for (const team of teams) {
+    const checked = selectedDbTeams.has(team) ? 'checked' : '';
+    html += `
+      <label class="filter-option">
+        <input type="checkbox" ${checked} onchange='toggleDbTeam(${JSON.stringify(team)})'>
+        <span>${escapeHtml(team)}</span>
+      </label>
+    `;
+  }
+  menu.innerHTML = html;
+}
+
+function selectAllDbTeams() {
+  selectedDbTeams = new Set(playersDb.map(r => r.nba_team));
+  renderDbTeamFilter(playersDb);
+  updateDbFilterButtons();
+  applyDbFilters();
+}
+
+function clearAllDbTeams() {
+  selectedDbTeams.clear();
+  renderDbTeamFilter(playersDb);
+  updateDbFilterButtons();
+  applyDbFilters();
+}
+
+function toggleDbTeam(team) {
+  if (selectedDbTeams.has(team)) selectedDbTeams.delete(team);
+  else selectedDbTeams.add(team);
+  renderDbTeamFilter(playersDb);
+  updateDbFilterButtons();
+  applyDbFilters();
+}
+
+function syncImportanceRangeDisplay() {
+  const minInput = document.getElementById('dbImportanceMin');
+  const maxInput = document.getElementById('dbImportanceMax');
+  const minVal = Number(minInput.value);
+  const maxVal = Number(maxInput.value);
+
+  dbImportanceMin = Math.min(minVal, maxVal);
+  dbImportanceMax = Math.max(minVal, maxVal);
+
+  if (Number(minInput.value) !== dbImportanceMin) minInput.value = dbImportanceMin;
+  if (Number(maxInput.value) !== dbImportanceMax) maxInput.value = dbImportanceMax;
+
+  document.getElementById('dbImportanceRangeValue').textContent = `${dbImportanceMin} - ${dbImportanceMax}`;
+  document.getElementById('dbImportanceMinValue').textContent = String(dbImportanceMin);
+  document.getElementById('dbImportanceMaxValue').textContent = String(dbImportanceMax);
+  updateDbFilterButtons();
+}
+
+function onDbImportanceRangeInput() {
+  syncImportanceRangeDisplay();
+  applyDbFilters();
+}
+
+function updateNewsDateFilterButton() {
+  const btn = document.getElementById('newsDateFilterButton');
+  const lastIndex = Math.max(newsDateOptions.length - 1, 0);
+  const usingFullRange = !newsDateOptions.length || (newsDateMinIndex === 0 && newsDateMaxIndex === lastIndex);
+  btn.textContent = usingFullRange
+    ? 'Caught At: All'
+    : `Caught At: ${formatShortDateTime(newsDateOptions[newsDateMinIndex])} - ${formatShortDateTime(newsDateOptions[newsDateMaxIndex])}`;
+  btn.classList.toggle('active', !usingFullRange);
+}
+
+function syncNewsDateRangeDisplay() {
+  const minInput = document.getElementById('newsDateMin');
+  const maxInput = document.getElementById('newsDateMax');
+  const lastIndex = Math.max(newsDateOptions.length - 1, 0);
+  const minVal = Math.min(Number(minInput.value || 0), Number(maxInput.value || 0), lastIndex);
+  const maxVal = Math.min(Math.max(Number(minInput.value || 0), Number(maxInput.value || 0)), lastIndex);
+
+  newsDateMinIndex = minVal;
+  newsDateMaxIndex = maxVal;
+
+  minInput.value = String(newsDateMinIndex);
+  maxInput.value = String(newsDateMaxIndex);
+
+  const minLabel = newsDateOptions[newsDateMinIndex] ? formatShortDateTime(newsDateOptions[newsDateMinIndex]) : 'All';
+  const maxLabel = newsDateOptions[newsDateMaxIndex] ? formatShortDateTime(newsDateOptions[newsDateMaxIndex]) : 'All';
+
+  document.getElementById('newsDateRangeValue').textContent =
+    newsDateOptions.length ? `${minLabel} - ${maxLabel}` : 'All';
+  document.getElementById('newsDateMinValue').textContent = minLabel;
+  document.getElementById('newsDateMaxValue').textContent = maxLabel;
+  updateNewsDateFilterButton();
+}
+
+function onNewsDateRangeInput() {
+  syncNewsDateRangeDisplay();
+  applyNewsFilters();
+}
+
+function updateNewsImportanceFilterButton() {
+  const btn = document.getElementById('newsImportanceFilterButton');
+  const usingFullRange =
+    newsImportanceMin === newsImportanceBounds.min && newsImportanceMax === newsImportanceBounds.max;
+  btn.textContent = usingFullRange
+    ? 'Player Importance: All'
+    : `Player Importance: ${newsImportanceMin} - ${newsImportanceMax}`;
+  btn.classList.toggle('active', !usingFullRange);
+}
+
+function syncNewsImportanceRangeDisplay() {
+  const minInput = document.getElementById('newsImportanceMin');
+  const maxInput = document.getElementById('newsImportanceMax');
+  const minVal = Number(minInput.value);
+  const maxVal = Number(maxInput.value);
+
+  newsImportanceMin = Math.min(minVal, maxVal);
+  newsImportanceMax = Math.max(minVal, maxVal);
+
+  if (Number(minInput.value) !== newsImportanceMin) minInput.value = newsImportanceMin;
+  if (Number(maxInput.value) !== newsImportanceMax) maxInput.value = newsImportanceMax;
+
+  document.getElementById('newsImportanceRangeValue').textContent = `${newsImportanceMin} - ${newsImportanceMax}`;
+  document.getElementById('newsImportanceMinValue').textContent = String(newsImportanceMin);
+  document.getElementById('newsImportanceMaxValue').textContent = String(newsImportanceMax);
+  updateNewsImportanceFilterButton();
+}
+
+function onNewsImportanceRangeInput() {
+  syncNewsImportanceRangeDisplay();
+  applyNewsFilters();
+}
+
+function updateNewsScoreFilterButton() {
+  const btn = document.getElementById('newsScoreFilterButton');
+  const usingFullRange = newsScoreMin === newsScoreBounds.min && newsScoreMax === newsScoreBounds.max;
+  btn.textContent = usingFullRange
+    ? 'Score Abs: All'
+    : `Score Abs: ${formatScore(newsScoreMin)} - ${formatScore(newsScoreMax)}`;
+  btn.classList.toggle('active', !usingFullRange);
+}
+
+function syncNewsScoreRangeDisplay() {
+  const minInput = document.getElementById('newsScoreMin');
+  const maxInput = document.getElementById('newsScoreMax');
+  const minVal = Number(minInput.value);
+  const maxVal = Number(maxInput.value);
+
+  newsScoreMin = Math.min(minVal, maxVal);
+  newsScoreMax = Math.max(minVal, maxVal);
+
+  if (Number(minInput.value) !== newsScoreMin) minInput.value = newsScoreMin;
+  if (Number(maxInput.value) !== newsScoreMax) maxInput.value = newsScoreMax;
+
+  document.getElementById('newsScoreRangeValue').textContent = `${formatScore(newsScoreMin)} - ${formatScore(newsScoreMax)}`;
+  document.getElementById('newsScoreMinValue').textContent = formatScore(newsScoreMin);
+  document.getElementById('newsScoreMaxValue').textContent = formatScore(newsScoreMax);
+  updateNewsScoreFilterButton();
+}
+
+function onNewsScoreRangeInput() {
+  syncNewsScoreRangeDisplay();
+  applyNewsFilters();
+}
+
+function configureNewsDateFilter(rows) {
+  const previousOptions = newsDateOptions;
+  const previousMin = previousOptions[newsDateMinIndex] || null;
+  const previousMax = previousOptions[newsDateMaxIndex] || null;
+  const previousWasFullRange =
+    !previousOptions.length || (newsDateMinIndex === 0 && newsDateMaxIndex === previousOptions.length - 1);
+
+  newsDateOptions = [...new Set(rows.map(row => row.timestamp_at).filter(Boolean))]
+    .sort((a, b) => (timeValue(a) ?? 0) - (timeValue(b) ?? 0));
+
+  const minInput = document.getElementById('newsDateMin');
+  const maxInput = document.getElementById('newsDateMax');
+  const lastIndex = Math.max(newsDateOptions.length - 1, 0);
+
+  minInput.min = '0';
+  maxInput.min = '0';
+  minInput.max = String(lastIndex);
+  maxInput.max = String(lastIndex);
+
+  if (!newsDateOptions.length) {
+    newsDateMinIndex = 0;
+    newsDateMaxIndex = 0;
+  } else if (previousWasFullRange || !previousMin || !previousMax) {
+    newsDateMinIndex = 0;
+    newsDateMaxIndex = lastIndex;
+  } else {
+    const previousMinTime = timeValue(previousMin) ?? -Infinity;
+    const previousMaxTime = timeValue(previousMax) ?? Infinity;
+
+    newsDateMinIndex = newsDateOptions.findIndex(value => (timeValue(value) ?? 0) >= previousMinTime);
+    if (newsDateMinIndex === -1) newsDateMinIndex = lastIndex;
+
+    newsDateMaxIndex = findLastMatchingIndex(newsDateOptions, value => (timeValue(value) ?? 0) <= previousMaxTime);
+    if (newsDateMaxIndex === -1) newsDateMaxIndex = 0;
+
+    if (newsDateMinIndex > newsDateMaxIndex) {
+      newsDateMinIndex = 0;
+      newsDateMaxIndex = lastIndex;
+    }
+  }
+
+  minInput.value = String(newsDateMinIndex);
+  maxInput.value = String(newsDateMaxIndex);
+  syncNewsDateRangeDisplay();
+}
+
+function configureNewsImportanceFilter(rows) {
+  const previousWasFullRange =
+    newsImportanceMin === newsImportanceBounds.min && newsImportanceMax === newsImportanceBounds.max;
+  const values = decorateScoredRows(rows).map(row => Number(row.player_importance) || 0);
+  const dbValues = playersDb.map(row => Number(row.importance)).filter(v => !Number.isNaN(v));
+
+  newsImportanceBounds = {
+    min: 0,
+    max: Math.max(0, ...values, ...dbValues),
+  };
+
+  const minInput = document.getElementById('newsImportanceMin');
+  const maxInput = document.getElementById('newsImportanceMax');
+  minInput.min = String(newsImportanceBounds.min);
+  minInput.max = String(newsImportanceBounds.max);
+  maxInput.min = String(newsImportanceBounds.min);
+  maxInput.max = String(newsImportanceBounds.max);
+
+  const firstLoadDefaults = newsImportanceMin === 0 && newsImportanceMax === 10;
+  const outOfBounds =
+    newsImportanceMin < newsImportanceBounds.min ||
+    newsImportanceMax > newsImportanceBounds.max ||
+    newsImportanceMin > newsImportanceMax;
+
+  if (previousWasFullRange || firstLoadDefaults || outOfBounds) {
+    newsImportanceMin = newsImportanceBounds.min;
+    newsImportanceMax = newsImportanceBounds.max;
+  }
+
+  minInput.value = String(newsImportanceMin);
+  maxInput.value = String(newsImportanceMax);
+  syncNewsImportanceRangeDisplay();
+}
+
+function configureNewsScoreFilter(rows) {
+  const previousWasFullRange =
+    newsScoreMin === newsScoreBounds.min && newsScoreMax === newsScoreBounds.max;
+  const values = decorateScoredRows(rows).map(row => Number(row.abs_score) || 0);
+
+  newsScoreBounds = {
+    min: 0,
+    max: Math.max(0, ...values),
+  };
+
+  const minInput = document.getElementById('newsScoreMin');
+  const maxInput = document.getElementById('newsScoreMax');
+  minInput.step = '0.01';
+  maxInput.step = '0.01';
+  minInput.min = String(newsScoreBounds.min);
+  minInput.max = String(newsScoreBounds.max);
+  maxInput.min = String(newsScoreBounds.min);
+  maxInput.max = String(newsScoreBounds.max);
+
+  const firstLoadDefaults = newsScoreMin === 0 && newsScoreMax === 100;
+  const outOfBounds =
+    newsScoreMin < newsScoreBounds.min ||
+    newsScoreMax > newsScoreBounds.max ||
+    newsScoreMin > newsScoreMax;
+
+  if (previousWasFullRange || firstLoadDefaults || outOfBounds) {
+    newsScoreMin = newsScoreBounds.min;
+    newsScoreMax = newsScoreBounds.max;
+  }
+
+  minInput.value = String(newsScoreMin);
+  maxInput.value = String(newsScoreMax);
+  syncNewsScoreRangeDisplay();
+}
+
+function sortPlayersDb(records) {
+  const sortBy = document.getElementById('dbSortBy').value;
+  const sorted = [...records];
+  sorted.sort((a, b) => {
+    if (sortBy === 'importance_desc') return b.importance - a.importance || a.player_name.localeCompare(b.player_name);
+    if (sortBy === 'importance_asc') return a.importance - b.importance || a.player_name.localeCompare(b.player_name);
+    if (sortBy === 'team_asc') return a.nba_team.localeCompare(b.nba_team) || b.importance - a.importance;
+    return a.player_name.localeCompare(b.player_name);
+  });
+  return sorted;
+}
+
+function renderPlayersDb(records) {
+  if (!records.length) {
+    document.getElementById('playersDbContainer').innerHTML =
+      '<div class="empty-state">No players found in the importance database.</div>';
+    return;
+  }
+
+  let html = `<p class="count-label">Showing <strong>${records.length}</strong> of <strong>${playersDb.length}</strong> player(s)</p>`;
+  html += '<table><thead><tr><th>Player</th><th>NBA Team</th><th>Importance</th><th>Actions</th></tr></thead><tbody>';
+
+  for (const r of records) {
+    const safeName = JSON.stringify(r.player_name);
+    const safeTeam = JSON.stringify(r.nba_team);
+    html += `<tr>
+      <td><strong>${escapeHtml(r.player_name)}</strong></td>
+      <td>${escapeHtml(r.nba_team)}</td>
+      <td><input type="number" min="0" max="10" value="${escapeHtml(r.importance)}" id="importance-${encodeURIComponent(r.player_name)}" style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:8px"></td>
+      <td>
+        <button class="clear-btn" onclick='savePlayer(${safeName}, ${safeTeam})'>Save</button>
+        <button class="clear-btn" style="margin-left:8px;color:#dc2626;border-color:#fecaca" onclick='deletePlayer(${safeName})'>Drop</button>
+      </td>
+    </tr>`;
+  }
+
+  html += '</tbody></table>';
+  document.getElementById('playersDbContainer').innerHTML = html;
+}
+
+function applyDbFilters() {
+  const search = document.getElementById('dbSearchPlayer').value.toLowerCase();
+
+  let filtered = playersDb.filter(r => {
+    if (search && !r.player_name.toLowerCase().includes(search)) return false;
+    if (selectedDbTeams.size && !selectedDbTeams.has(r.nba_team)) return false;
+    if (Number(r.importance) < dbImportanceMin || Number(r.importance) > dbImportanceMax) return false;
+    return true;
+  });
+
+  renderPlayersDb(sortPlayersDb(filtered));
+}
+
+function renderDbSuggestions() {
+  const input = document.getElementById('dbSearchPlayer');
+  const box = document.getElementById('dbPlayerSuggestions');
+  const query = input.value.trim().toLowerCase();
+
+  if (!query) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+
+  const matches = [...new Set(
+    playersDb
+      .map(r => r.player_name)
+      .filter(name => name.toLowerCase().includes(query))
+  )].slice(0, 8);
+
+  if (!matches.length) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+
+  box.innerHTML = matches.map(name =>
+    `<div class="suggestion-item" onclick='selectDbSuggestion(${JSON.stringify(name)})'>${escapeHtml(name)}</div>`
+  ).join('');
+  box.style.display = 'block';
+}
+
+function selectDbSuggestion(name) {
+  document.getElementById('dbSearchPlayer').value = name;
+  document.getElementById('dbPlayerSuggestions').style.display = 'none';
+  applyDbFilters();
+}
+
+function transitionTypeLabel(type) {
+  return TRANSITION_TYPE_LABELS[type] || type || '';
+}
+
+function transitionRowKey(type, fromState, toState) {
+  return `${type}|${fromState}|${toState}`;
+}
+
+function renderTransitionState(state) {
+  if (TRANSITION_STATUS_ORDER.includes(state)) {
+    return `<span class="badge ${statusClass(state)}">${escapeHtml(state)}</span>`;
+  }
+  return escapeHtml(state);
+}
+
+function transitionConfigMap(rows) {
+  return new Map(rows.map(row => [transitionRowKey(row.transition_type, row.from_state, row.to_state), row]));
+}
+
+function renderTransitionInputCell(row) {
+  if (!row) {
+    return '<td class="same-state-cell">-</td>';
+  }
+  const safeType = JSON.stringify(row.transition_type);
+  const safeFrom = JSON.stringify(row.from_state);
+  const safeTo = JSON.stringify(row.to_state);
+  const inputId = `transition-score-${encodeURIComponent(transitionRowKey(row.transition_type, row.from_state, row.to_state))}`;
+  return `<td><input class="transition-score-input" type="number" min="-100" max="100" value="${escapeHtml(row.score)}" id="${inputId}" onchange='saveTransitionConfig(${safeType}, ${safeFrom}, ${safeTo})'></td>`;
+}
+
+function renderStatusChangeMatrix(configMap) {
+  let html = '<div class="transition-section">';
+  html += `<h3>${escapeHtml(transitionTypeLabel('status_change'))}</h3>`;
+  html += '<p>Rows are the current status and columns are the new status.</p>';
+  html += '<div class="transition-grid-wrap"><table class="transition-grid"><thead><tr><th>From \\ To</th>';
+  for (const toState of TRANSITION_STATUS_ORDER) {
+    html += `<th>${renderTransitionState(toState)}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const fromState of TRANSITION_STATUS_ORDER) {
+    html += `<tr><td class="state-cell">${renderTransitionState(fromState)}</td>`;
+    for (const toState of TRANSITION_STATUS_ORDER) {
+      if (fromState === toState) {
+        html += '<td class="same-state-cell">-</td>';
+      } else {
+        const row = configMap.get(transitionRowKey('status_change', fromState, toState));
+        html += renderTransitionInputCell(row);
+      }
+    }
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+function renderAddedMatrix(configMap) {
+  let html = '<div class="transition-section">';
+  html += `<h3>${escapeHtml(transitionTypeLabel('added'))}</h3>`;
+  html += '<p>Scores for a player appearing on the report from not being on it before.</p>';
+  html += '<div class="transition-grid-wrap"><table class="transition-grid"><thead><tr><th>From \\ To</th>';
+  for (const toState of TRANSITION_STATUS_ORDER) {
+    html += `<th>${renderTransitionState(toState)}</th>`;
+  }
+  html += `</tr></thead><tbody><tr><td class="state-cell">${escapeHtml('Not On Report')}</td>`;
+  for (const toState of TRANSITION_STATUS_ORDER) {
+    const row = configMap.get(transitionRowKey('added', 'Not On Report', toState));
+    html += renderTransitionInputCell(row);
+  }
+  html += '</tr></tbody></table></div></div>';
+  return html;
+}
+
+function renderRemovedMatrix(configMap) {
+  let html = '<div class="transition-section">';
+  html += `<h3>${escapeHtml(transitionTypeLabel('removed'))}</h3>`;
+  html += '<p>Scores for a player leaving the report from each prior status.</p>';
+  html += '<div class="transition-grid-wrap"><table class="transition-grid"><thead><tr><th>From \\ To</th>';
+  for (const fromState of TRANSITION_STATUS_ORDER) {
+    html += `<th>${renderTransitionState(fromState)}</th>`;
+  }
+  html += `</tr></thead><tbody><tr><td class="state-cell">${escapeHtml('Removed')}</td>`;
+  for (const fromState of TRANSITION_STATUS_ORDER) {
+    const row = configMap.get(transitionRowKey('removed', fromState, 'Removed'));
+    html += renderTransitionInputCell(row);
+  }
+  html += '</tr></tbody></table></div></div>';
+  return html;
+}
+
+function renderTransitionConfigs(rows) {
+  if (!rows.length) {
+    document.getElementById('transitionsContainer').innerHTML =
+      '<div class="empty-state">No transition score rows found.</div>';
+    return;
+  }
+
+  const configMap = transitionConfigMap(rows);
+  let html = '<div class="transition-sections">';
+  html += renderStatusChangeMatrix(configMap);
+  html += renderAddedMatrix(configMap);
+  html += renderRemovedMatrix(configMap);
+  html += '</div>';
+  document.getElementById('transitionsContainer').innerHTML = html;
+}
+
+function applyTransitionFilters() {
+  renderTransitionConfigs(transitionConfigs);
+}
+
+function renderNotifications(notifications) {
+  const el = document.getElementById('notifList');
+  document.getElementById('notifCount').textContent = notifications.length;
+
+  if (!notifications.length) {
+    el.innerHTML = '<div class="empty-state">Watching for changes...</div>';
+    return;
+  }
+
+  let html = '';
+  for (const n of decorateScoredRows(notifications).slice(0, 100)) {
+    const icon = ICON_MAP[n.type] || '?';
+    html += `<div class="notif-item">
+      <span class="notif-icon ${n.type}">${icon}</span>
+      <span class="notif-player">${escapeHtml(n.player)}</span>
+      <span style="color:#6b7280;font-size:13px"> (${escapeHtml(n.team)})</span>
+      <div class="notif-detail">${escapeHtml(n.detail)}</div>
+      <div class="notif-score ${scoreClass(n.score)}">Score: ${escapeHtml(formatScore(n.score))}</div>
+      <div class="notif-time">${escapeHtml(formatLocalDateTime(n.timestamp_at))}</div>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function newsTypeLabel(type) {
+  if (type === 'added') return 'Added';
+  if (type === 'removed') return 'Removed';
+  if (type === 'status_change') return 'Status Change';
+  if (type === 'injury_change') return 'Injury Change';
+  return type || '';
+}
+
+function newsToneClass(tone) {
+  if (tone === 'positive') return 'news-positive';
+  if (tone === 'negative') return 'news-negative';
+  return 'news-neutral';
+}
+
+function renderNewsTable(rows) {
+  if (!rows.length) {
+    document.getElementById('newsTableContainer').innerHTML =
+      '<div class="empty-state">No caught news yet.</div>';
+    return;
+  }
+
+  let html = `<p class="count-label">Showing <strong>${rows.length}</strong> of <strong>${newsRows.length}</strong> caught event(s)</p>`;
+  html += '<table><thead><tr><th>Caught At</th><th>Type</th><th>Team</th><th>Player</th><th>Game Affected</th><th>Player Importance</th><th>Score</th><th>Status</th><th>News</th></tr></thead><tbody>';
+
+  for (const row of rows) {
+    const statusHtml = row.status
+      ? `<span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>`
+      : '';
+    html += `<tr>
+      <td>${escapeHtml(formatLocalDateTime(row.timestamp_at))}</td>
+      <td>${escapeHtml(newsTypeLabel(row.type))}</td>
+      <td>${escapeHtml(row.team || '')}</td>
+      <td><strong>${escapeHtml(row.player || '')}</strong></td>
+      <td>${escapeHtml(formatAffectedGame(row))}</td>
+      <td>${escapeHtml(row.player_importance ?? 0)}</td>
+      <td class="${scoreClass(row.score)}">${escapeHtml(formatScore(row.score))}</td>
+      <td>${statusHtml}</td>
+      <td class="${newsToneClass(row.tone)}">${escapeHtml(row.detail || row.injury || '')}</td>
+    </tr>`;
+  }
+
+  html += '</tbody></table>';
+  document.getElementById('newsTableContainer').innerHTML = html;
+}
+
+function applyNewsFilters() {
+  const search = document.getElementById('newsSearchPlayer').value.toLowerCase();
+  const type = document.getElementById('newsTypeFilter').value;
+  const minTime = newsDateOptions[newsDateMinIndex] ? (timeValue(newsDateOptions[newsDateMinIndex]) ?? -Infinity) : -Infinity;
+  const maxTime = newsDateOptions[newsDateMaxIndex] ? (timeValue(newsDateOptions[newsDateMaxIndex]) ?? Infinity) : Infinity;
+  const rowsWithImportance = decorateScoredRows(newsRows);
+
+  let filtered = rowsWithImportance.filter(row => {
+    if (search) {
+      const haystack = `${row.player || ''} ${row.team || ''} ${row.detail || ''}`.toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    if (type && row.type !== type) return false;
+    const rowTime = timeValue(row.timestamp_at);
+    if (rowTime !== null && (rowTime < minTime || rowTime > maxTime)) return false;
+    if (Number(row.player_importance || 0) < newsImportanceMin || Number(row.player_importance || 0) > newsImportanceMax) return false;
+    if (Number(row.abs_score || 0) < newsScoreMin || Number(row.abs_score || 0) > newsScoreMax) return false;
+    return true;
+  });
+
+  renderNewsTable(filtered);
+}
+
+async function fetchReport() {
+  try {
+    const res = await fetch('/api/report');
+    const data = await res.json();
+    renderStatus(data.status);
+    if (data.records && data.records.length > 0) {
+      allRecords = data.records;
+      populateInjuryTeams(allRecords);
+      applyInjuryFilters();
+      document.getElementById('lastReport').innerHTML =
+        `Last report: <strong>${escapeHtml(formatLocalDateTime(data.last_report_at) || 'N/A')}</strong>`;
+    }
+  } catch (e) {
+    renderStatus(null);
+    console.error('fetch report error', e);
+  }
+}
+
+async function fetchUpcomingGames() {
+  try {
+    const res = await fetch('/api/upcoming-games');
+    const data = await res.json();
+    upcomingGames = data.rows || [];
+    renderUpcomingGames(upcomingGames);
+  } catch (e) {
+    console.error('fetch upcoming games error', e);
+  }
+}
+
+async function fetchNotifications() {
+  try {
+    const res = await fetch('/api/notifications');
+    const data = await res.json();
+    notificationsData = data.notifications || [];
+    renderNotifications(notificationsData);
+    renderTeamGameNews();
+  } catch (e) {
+    console.error('fetch notifications error', e);
+  }
+}
+
+async function fetchNewsLog() {
+  try {
+    const res = await fetch('/api/news-log');
+    const data = await res.json();
+    newsRows = data.rows || [];
+    configureNewsDateFilter(newsRows);
+    configureNewsImportanceFilter(newsRows);
+    configureNewsScoreFilter(newsRows);
+    applyNewsFilters();
+    renderTeamGameNews();
+  } catch (e) {
+    console.error('fetch news log error', e);
+  }
+}
+
+async function fetchPlayersDb() {
+  try {
+    const res = await fetch('/api/players-db');
+    const data = await res.json();
+    playersDb = data.players || [];
+    if (playersDb.length) {
+      const values = playersDb.map(r => Number(r.importance)).filter(v => !Number.isNaN(v));
+      dbImportanceBounds = {
+        min: Math.min(...values),
+        max: Math.max(...values),
+      };
+      const minInput = document.getElementById('dbImportanceMin');
+      const maxInput = document.getElementById('dbImportanceMax');
+      minInput.min = String(dbImportanceBounds.min);
+      minInput.max = String(dbImportanceBounds.max);
+      maxInput.min = String(dbImportanceBounds.min);
+      maxInput.max = String(dbImportanceBounds.max);
+
+      const firstLoadDefaults = dbImportanceMin === 0 && dbImportanceMax === 10;
+      const outOfBounds =
+        dbImportanceMin < dbImportanceBounds.min ||
+        dbImportanceMax > dbImportanceBounds.max ||
+        dbImportanceMin > dbImportanceMax;
+      if (firstLoadDefaults || outOfBounds) {
+        dbImportanceMin = dbImportanceBounds.min;
+        dbImportanceMax = dbImportanceBounds.max;
+      }
+
+      minInput.value = String(dbImportanceMin);
+      maxInput.value = String(dbImportanceMax);
+    }
+    renderDbTeamFilter(playersDb);
+    syncImportanceRangeDisplay();
+    renderDbSuggestions();
+    applyDbFilters();
+    configureNewsImportanceFilter(newsRows);
+    configureNewsScoreFilter(newsRows);
+    applyNewsFilters();
+    renderNotifications(notificationsData);
+    renderTeamGameNews();
+  } catch (e) {
+    console.error('fetch players db error', e);
+  }
+}
+
+async function fetchTransitionConfigs() {
+  try {
+    const res = await fetch('/api/transition-config');
+    const data = await res.json();
+    transitionConfigs = data.rows || [];
+    applyTransitionFilters();
+    configureNewsScoreFilter(newsRows);
+    applyNewsFilters();
+    renderNotifications(notificationsData);
+    renderTeamGameNews();
+  } catch (e) {
+    console.error('fetch transition config error', e);
+  }
+}
+
+async function saveTransitionConfig(transitionType, fromState, toState) {
+  const inputId = `transition-score-${encodeURIComponent(transitionRowKey(transitionType, fromState, toState))}`;
+  const score = Number(document.getElementById(inputId).value);
+  if (Number.isNaN(score)) return;
+
+  await fetch('/api/transition-config/upsert', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      transition_type: transitionType,
+      from_state: fromState,
+      to_state: toState,
+      score,
+    }),
+  });
+  await fetchTransitionConfigs();
+}
+
+async function savePlayer(playerName, currentTeam) {
+  const importanceEl = document.getElementById(`importance-${encodeURIComponent(playerName)}`);
+  const importance = Number(importanceEl.value);
+  await fetch('/api/players-db/upsert', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      player_name: playerName,
+      nba_team: currentTeam,
+      importance,
+    }),
+  });
+  await fetchPlayersDb();
+}
+
+async function addOrUpdatePlayer() {
+  const player_name = document.getElementById('addPlayerName').value.trim();
+  const nba_team = document.getElementById('addPlayerTeam').value.trim();
+  const importance = Number(document.getElementById('addPlayerImportance').value);
+  if (!player_name || !nba_team || Number.isNaN(importance)) return;
+
+  await fetch('/api/players-db/upsert', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ player_name, nba_team, importance }),
+  });
+
+  document.getElementById('addPlayerName').value = '';
+  document.getElementById('addPlayerTeam').value = '';
+  document.getElementById('addPlayerImportance').value = '';
+  await fetchPlayersDb();
+}
+
+async function deletePlayer(playerName) {
+  await fetch('/api/players-db/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ player_name: playerName }),
+  });
+  await fetchPlayersDb();
+}
+
+async function clearNotifications() {
+  await fetch('/api/clear-notifications');
+  renderNotifications([]);
+}
+
+async function clearNewsLog() {
+  await fetch('/api/clear-news-log');
+  newsRows = [];
+  configureNewsDateFilter(newsRows);
+  configureNewsImportanceFilter(newsRows);
+  configureNewsScoreFilter(newsRows);
+  applyNewsFilters();
+  renderTeamGameNews();
+}
+
+document.getElementById('searchPlayer').addEventListener('input', applyInjuryFilters);
+document.getElementById('filterStatus').addEventListener('change', applyInjuryFilters);
+document.getElementById('filterTeam').addEventListener('change', applyInjuryFilters);
+document.getElementById('dbSearchPlayer').addEventListener('input', () => {
+  renderDbSuggestions();
+  applyDbFilters();
+});
+document.getElementById('dbSearchPlayer').addEventListener('focus', renderDbSuggestions);
+document.getElementById('dbSortBy').addEventListener('change', applyDbFilters);
+document.getElementById('dbImportanceMin').addEventListener('input', onDbImportanceRangeInput);
+document.getElementById('dbImportanceMax').addEventListener('input', onDbImportanceRangeInput);
+document.getElementById('newsSearchPlayer').addEventListener('input', applyNewsFilters);
+document.getElementById('newsTypeFilter').addEventListener('change', applyNewsFilters);
+document.getElementById('newsDateMin').addEventListener('input', onNewsDateRangeInput);
+document.getElementById('newsDateMax').addEventListener('input', onNewsDateRangeInput);
+document.getElementById('newsImportanceMin').addEventListener('input', onNewsImportanceRangeInput);
+document.getElementById('newsImportanceMax').addEventListener('input', onNewsImportanceRangeInput);
+document.getElementById('newsScoreMin').addEventListener('input', onNewsScoreRangeInput);
+document.getElementById('newsScoreMax').addEventListener('input', onNewsScoreRangeInput);
+document.getElementById('clearNewsBtn').addEventListener('click', clearNewsLog);
+document.getElementById('addPlayerBtn').addEventListener('click', addOrUpdatePlayer);
+document.getElementById('tabInjuries').addEventListener('click', () => setActiveTab('injuries'));
+document.getElementById('tabGames').addEventListener('click', () => {
+  setActiveTab('games');
+  fetchUpcomingGames();
+});
+document.getElementById('tabTeamGameNews').addEventListener('click', () => {
+  setActiveTab('teamGameNews');
+  renderTeamGameNews();
+});
+document.getElementById('tabNews').addEventListener('click', () => setActiveTab('news'));
+document.getElementById('tabPlayers').addEventListener('click', () => setActiveTab('players'));
+document.getElementById('tabTransitions').addEventListener('click', () => setActiveTab('transitions'));
+document.getElementById('dbTeamFilterButton').addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleDbMenu('dbTeamFilterMenu');
+});
+document.getElementById('dbImportanceFilterButton').addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleDbMenu('dbImportanceFilterMenu');
+});
+document.getElementById('newsDateFilterButton').addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleDbMenu('newsDateFilterMenu');
+});
+document.getElementById('newsImportanceFilterButton').addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleDbMenu('newsImportanceFilterMenu');
+});
+document.getElementById('newsScoreFilterButton').addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleDbMenu('newsScoreFilterMenu');
+});
+document.getElementById('dbTeamFilterMenu').addEventListener('click', (e) => e.stopPropagation());
+document.getElementById('dbImportanceFilterMenu').addEventListener('click', (e) => e.stopPropagation());
+document.getElementById('newsDateFilterMenu').addEventListener('click', (e) => e.stopPropagation());
+document.getElementById('newsImportanceFilterMenu').addEventListener('click', (e) => e.stopPropagation());
+document.getElementById('newsScoreFilterMenu').addEventListener('click', (e) => e.stopPropagation());
+document.addEventListener('click', () => {
+  closeDbMenus();
+  setTimeout(() => {
+    document.getElementById('dbPlayerSuggestions').style.display = 'none';
+  }, 100);
+});
+
+setActiveTab('injuries');
+fetchReport();
+fetchUpcomingGames();
+fetchNotifications();
+fetchPlayersDb();
+fetchTransitionConfigs();
+fetchNewsLog();
+
+setInterval(() => {
+  fetchReport();
+  fetchNotifications();
+  fetchNewsLog();
+  if (activeTab === 'games') fetchUpcomingGames();
+  fetchTransitionConfigs();
+  fetchPlayersDb();
+}, 10000);
+</script>
+
+</body>
+</html>
