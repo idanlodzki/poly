@@ -698,6 +698,156 @@
       position: relative;
     }
   }
+
+  /* ── Toggle switch ── */
+  .toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .toggle-track {
+    position: relative;
+    width: 52px;
+    height: 28px;
+    border-radius: 14px;
+    background: #d1d5db;
+    transition: background 0.25s;
+    flex-shrink: 0;
+  }
+  .toggle-track.on {
+    background: var(--green);
+  }
+  .toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    transition: transform 0.25s;
+  }
+  .toggle-track.on .toggle-thumb {
+    transform: translateX(24px);
+  }
+  .toggle-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* ── Betting status banner ── */
+  .betting-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    border: 1px solid;
+    transition: all 0.3s;
+  }
+  .betting-status.active {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-color: #86efac;
+    color: #15803d;
+  }
+  .betting-status.inactive {
+    background: #f9fafb;
+    border-color: var(--border);
+    color: var(--text-secondary);
+  }
+  .betting-status .pulse-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .betting-status.active .pulse-dot {
+    background: var(--green);
+    animation: pulse 1.5s infinite;
+  }
+  .betting-status.inactive .pulse-dot {
+    background: #9ca3af;
+  }
+
+  /* ── Betting config card ── */
+  .betting-config-card {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 18px 22px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .betting-config-card .threshold-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .betting-config-card .threshold-group input {
+    width: 90px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg);
+    text-align: center;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .betting-config-card .threshold-group input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  }
+
+  /* ── Last trade card ── */
+  .last-trade-card {
+    background: linear-gradient(135deg, #faf5ff 0%, #f5f3ff 50%, #eef2ff 100%);
+    border: 1px solid #c4b5fd;
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 16px;
+  }
+  .last-trade-card .card-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #7c3aed;
+    margin-bottom: 12px;
+  }
+  .last-trade-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px 20px;
+  }
+  .last-trade-grid .lt-item {
+    font-size: 13px;
+  }
+  .last-trade-grid .lt-label {
+    color: #6b7280;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 2px;
+  }
+  .last-trade-grid .lt-value {
+    font-weight: 600;
+    font-size: 14px;
+  }
 </style>
 </head>
 <body>
@@ -716,6 +866,7 @@
       <button class="clear-btn" id="tabNews">Caught News</button>
       <button class="clear-btn" id="tabPlayers">Player Importance DB</button>
       <button class="clear-btn" id="tabTransitions">Transition Scores</button>
+      <button class="clear-btn" id="tabBetting">Betting</button>
       <span class="status-pill connected" id="serverStatus">Connecting...</span>
       <span class="last-report" id="lastReport">Last report: loading...</span>
     </div>
@@ -827,6 +978,38 @@
       </div>
     </section>
 
+    <section id="bettingTab" style="display:none">
+      <div id="bettingStatusBanner" class="betting-status inactive">
+        <span class="pulse-dot"></span>
+        <span id="bettingStatusText">Auto trade is off</span>
+      </div>
+
+      <div class="betting-config-card">
+        <div class="toggle-wrap" id="autoTradeToggleWrap">
+          <div class="toggle-track" id="autoTradeTrack">
+            <div class="toggle-thumb"></div>
+          </div>
+          <span class="toggle-label">Auto Trade</span>
+        </div>
+        <div class="threshold-group">
+          <span style="font-weight:600;color:var(--text)">Edge threshold</span>
+          <input type="number" id="betThresholdInput" min="0" step="0.5" value="10">
+        </div>
+        <div style="margin-left:auto">
+          <button class="clear-btn" id="clearBetLogBtn" style="padding:6px 14px;color:#dc2626;border-color:#fecaca">Clear History</button>
+        </div>
+      </div>
+
+      <div id="lastTradePanel" class="last-trade-card" style="display:none">
+        <div class="card-title">Latest Trade Signal</div>
+        <div id="lastTradeContent" class="last-trade-grid"></div>
+      </div>
+
+      <div id="betLogContainer">
+        <div class="empty-state">No bets logged yet. Enable auto trade and set a threshold.</div>
+      </div>
+    </section>
+
     <section id="newsTab" style="display:none">
       <div class="controls">
         <input type="text" id="newsSearchPlayer" placeholder="Search caught news...">
@@ -932,6 +1115,7 @@ let notificationsData = [];
 let transitionConfigs = [];
 let upcomingGames = [];
 let expandedTeamGameNewsKeys = new Set();
+let expandedOddsSlugs = new Set();
 let injurySortCol = 'team';
 let injurySortDir = 1;
 let activeTab = 'injuries';
@@ -1256,6 +1440,7 @@ function setActiveTab(tab) {
   document.getElementById('teamGameNewsTab').style.display = tab === 'teamGameNews' ? '' : 'none';
   document.getElementById('playersTab').style.display = tab === 'players' ? '' : 'none';
   document.getElementById('transitionsTab').style.display = tab === 'transitions' ? '' : 'none';
+  document.getElementById('bettingTab').style.display = tab === 'betting' ? '' : 'none';
   document.getElementById('newsTab').style.display = tab === 'news' ? '' : 'none';
   document.getElementById('tabInjuries').style.background = tab === 'injuries' ? '#eef2ff' : '';
   document.getElementById('tabInjuries').style.color = tab === 'injuries' ? '#4338ca' : '';
@@ -1269,6 +1454,8 @@ function setActiveTab(tab) {
   document.getElementById('tabPlayers').style.color = tab === 'players' ? '#4338ca' : '';
   document.getElementById('tabTransitions').style.background = tab === 'transitions' ? '#eef2ff' : '';
   document.getElementById('tabTransitions').style.color = tab === 'transitions' ? '#4338ca' : '';
+  document.getElementById('tabBetting').style.background = tab === 'betting' ? '#eef2ff' : '';
+  document.getElementById('tabBetting').style.color = tab === 'betting' ? '#4338ca' : '';
 }
 
 function closeDbMenus(exceptId = null) {
@@ -1441,6 +1628,7 @@ async function toggleOddsRow(btn, slug, polyUrl, colSpan) {
   const existing = tr.nextElementSibling;
   if (existing && existing.classList.contains('odds-detail-row')) {
     existing.remove();
+    expandedOddsSlugs.delete(slug);
     btn.textContent = '📈 Odds';
     return;
   }
@@ -1454,6 +1642,7 @@ async function toggleOddsRow(btn, slug, polyUrl, colSpan) {
     td.innerHTML = renderOddsPanel(data, polyUrl);
     detailTr.appendChild(td);
     tr.after(detailTr);
+    expandedOddsSlugs.add(slug);
     btn.textContent = '📈 Hide';
   } catch (e) {
     btn.textContent = '❌ Error';
@@ -1495,6 +1684,17 @@ function renderUpcomingGames(rows) {
 
   html += '</tbody></table>';
   document.getElementById('gamesContainer').innerHTML = html;
+
+  // Re-expand any odds rows that were open before re-render
+  for (const openSlug of [...expandedOddsSlugs]) {
+    const btn = document.querySelector(`button[onclick*="'${openSlug}'"]`);
+    if (btn) {
+      expandedOddsSlugs.delete(openSlug);
+      const onclickAttr = btn.getAttribute('onclick') || '';
+      const urlMatch = onclickAttr.match(/'(https[^']*?)'/);
+      toggleOddsRow(btn, openSlug, urlMatch ? urlMatch[1] : '', 8);
+    }
+  }
 }
 
 function parseMatchupTeams(matchup) {
@@ -2481,6 +2681,149 @@ async function clearNotifications() {
   renderNotifications([]);
 }
 
+let bettingConfig = { auto_trade_enabled: false, threshold: 10.0 };
+let betLog = [];
+let _bettingConfigDirty = false;
+let _thresholdSaveTimer = null;
+
+function updateBettingStatusBanner() {
+  const banner = document.getElementById('bettingStatusBanner');
+  const text = document.getElementById('bettingStatusText');
+  if (bettingConfig.auto_trade_enabled) {
+    banner.className = 'betting-status active';
+    text.textContent = `Auto trading is live — edge threshold ${formatScore(bettingConfig.threshold)}`;
+  } else {
+    banner.className = 'betting-status inactive';
+    text.textContent = 'Auto trade is off';
+  }
+}
+
+function syncBettingToggleUI() {
+  const track = document.getElementById('autoTradeTrack');
+  if (bettingConfig.auto_trade_enabled) {
+    track.classList.add('on');
+  } else {
+    track.classList.remove('on');
+  }
+  updateBettingStatusBanner();
+}
+
+async function pushBettingConfig() {
+  try {
+    await fetch('/api/betting-config/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        auto_trade_enabled: bettingConfig.auto_trade_enabled,
+        threshold: bettingConfig.threshold,
+      }),
+    });
+    // Keep dirty until threshold input loses focus, so polls don't overwrite
+  } catch (e) {
+    console.error('save betting config error', e);
+  }
+}
+
+async function fetchBettingConfig() {
+  try {
+    const res = await fetch('/api/betting-config');
+    const data = await res.json();
+    const thresholdInput = document.getElementById('betThresholdInput');
+    const isFocused = document.activeElement === thresholdInput;
+    // Never overwrite while user is editing or has pending saves
+    if (!_bettingConfigDirty && !isFocused) {
+      bettingConfig = data;
+      syncBettingToggleUI();
+      thresholdInput.value = data.threshold;
+    } else {
+      // Still sync the toggle state from server (it saves instantly)
+      bettingConfig.auto_trade_enabled = data.auto_trade_enabled;
+      syncBettingToggleUI();
+    }
+  } catch (e) {
+    console.error('fetch betting config error', e);
+  }
+}
+
+async function fetchBetLog() {
+  try {
+    const res = await fetch('/api/bet-log');
+    const data = await res.json();
+    betLog = data.rows || [];
+    renderBetLog();
+    renderLastTradeInfo();
+  } catch (e) {
+    console.error('fetch bet log error', e);
+  }
+}
+
+function renderBetLog() {
+  const container = document.getElementById('betLogContainer');
+  if (!betLog.length) {
+    container.innerHTML = '<div class="empty-state">No bets logged yet. Enable auto trade and set a threshold.</div>';
+    return;
+  }
+
+  let html = `<p class="count-label">Showing <strong>${betLog.length}</strong> bet(s)</p>`;
+  html += '<table><thead><tr><th>Timestamp</th><th>Matchup</th><th>Edge Score</th><th>Profitable Team</th><th>Market Type</th><th>Market Odds</th><th>Closeness</th><th>Status</th></tr></thead><tbody>';
+
+  for (const bet of betLog) {
+    const oddsStr = (bet.market_outcomes || []).map((o, i) => {
+      const p = bet.market_prices && bet.market_prices[i] ? (parseFloat(bet.market_prices[i]) * 100).toFixed(1) + '%' : '?';
+      return `${escapeHtml(o)}: ${p}`;
+    }).join(' / ') || 'N/A';
+
+    const profitableColor = teamColor(bet.profitable_team);
+
+    html += `<tr>
+      <td>${escapeHtml(formatLocalDateTime(bet.timestamp))}</td>
+      <td><strong>${renderColoredMatchup(bet.away_tricode, bet.home_tricode, bet.matchup || '')}</strong></td>
+      <td class="${scoreClass(bet.edge_score)}">${escapeHtml(formatScore(bet.edge_score))}</td>
+      <td><span style="color:${profitableColor};font-weight:700">${escapeHtml(bet.profitable_team || '')}</span></td>
+      <td>${escapeHtml(bet.market_type || 'N/A')}</td>
+      <td style="font-size:12px">${oddsStr}</td>
+      <td>${bet.market_closeness != null ? escapeHtml(bet.market_closeness.toFixed(4)) : 'N/A'}</td>
+      <td><span class="badge badge-available">${escapeHtml(bet.status || '')}</span></td>
+    </tr>`;
+  }
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function renderLastTradeInfo() {
+  const panel = document.getElementById('lastTradePanel');
+  const content = document.getElementById('lastTradeContent');
+  if (!betLog.length) {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = '';
+  const last = betLog[0];
+  const oddsStr = (last.market_outcomes || []).map((o, i) => {
+    const p = last.market_prices && last.market_prices[i] ? (parseFloat(last.market_prices[i]) * 100).toFixed(1) + '%' : '?';
+    return `<span style="font-weight:600">${escapeHtml(o)}</span>: ${p}`;
+  }).join(' &nbsp;&middot;&nbsp; ') || 'N/A';
+  const profitableColor = teamColor(last.profitable_team);
+
+  content.innerHTML = `
+    <div class="lt-item"><div class="lt-label">Matchup</div><div class="lt-value">${renderColoredMatchup(last.away_tricode, last.home_tricode, last.matchup || '')}</div></div>
+    <div class="lt-item"><div class="lt-label">Edge Score</div><div class="lt-value ${scoreClass(last.edge_score)}">${escapeHtml(formatScore(last.edge_score))}</div></div>
+    <div class="lt-item"><div class="lt-label">Profitable Team</div><div class="lt-value" style="color:${profitableColor}">${escapeHtml(last.profitable_team || '')}</div></div>
+    <div class="lt-item"><div class="lt-label">Market</div><div class="lt-value">${escapeHtml(last.market_type || 'N/A')}</div></div>
+    <div class="lt-item"><div class="lt-label">Odds</div><div class="lt-value" style="font-size:13px">${oddsStr}</div></div>
+    <div class="lt-item"><div class="lt-label">Closeness to 50/50</div><div class="lt-value">${last.market_closeness != null ? last.market_closeness.toFixed(4) : 'N/A'}</div></div>
+    <div class="lt-item"><div class="lt-label">Logged At</div><div class="lt-value">${escapeHtml(formatLocalDateTime(last.timestamp))}</div></div>
+  `;
+}
+
+async function clearBetLog() {
+  await fetch('/api/clear-bet-log');
+  betLog = [];
+  renderBetLog();
+  renderLastTradeInfo();
+}
+
 async function clearNewsLog() {
   await fetch('/api/clear-news-log');
   newsRows = [];
@@ -2524,6 +2867,31 @@ document.getElementById('tabTeamGameNews').addEventListener('click', () => {
 document.getElementById('tabNews').addEventListener('click', () => setActiveTab('news'));
 document.getElementById('tabPlayers').addEventListener('click', () => setActiveTab('players'));
 document.getElementById('tabTransitions').addEventListener('click', () => setActiveTab('transitions'));
+document.getElementById('tabBetting').addEventListener('click', () => {
+  setActiveTab('betting');
+  fetchBettingConfig();
+  fetchBetLog();
+});
+document.getElementById('autoTradeToggleWrap').addEventListener('click', () => {
+  bettingConfig.auto_trade_enabled = !bettingConfig.auto_trade_enabled;
+  _bettingConfigDirty = true;
+  syncBettingToggleUI();
+  pushBettingConfig();
+});
+document.getElementById('betThresholdInput').addEventListener('input', () => {
+  const val = Number(document.getElementById('betThresholdInput').value);
+  if (!Number.isNaN(val) && val >= 0) {
+    bettingConfig.threshold = val;
+    _bettingConfigDirty = true;
+    updateBettingStatusBanner();
+    clearTimeout(_thresholdSaveTimer);
+    _thresholdSaveTimer = setTimeout(() => pushBettingConfig(), 600);
+  }
+});
+document.getElementById('betThresholdInput').addEventListener('blur', () => {
+  _bettingConfigDirty = false;
+});
+document.getElementById('clearBetLogBtn').addEventListener('click', clearBetLog);
 document.getElementById('dbTeamFilterButton').addEventListener('click', (e) => {
   e.stopPropagation();
   toggleDbMenu('dbTeamFilterMenu');
@@ -2563,12 +2931,15 @@ fetchNotifications();
 fetchPlayersDb();
 fetchTransitionConfigs();
 fetchNewsLog();
+fetchBettingConfig();
+fetchBetLog();
 
 setInterval(() => {
   fetchReport();
   fetchNotifications();
   fetchNewsLog();
   if (activeTab === 'games') fetchUpcomingGames();
+  if (activeTab === 'betting') { fetchBettingConfig(); fetchBetLog(); }
   fetchTransitionConfigs();
   fetchPlayersDb();
 }, 10000);

@@ -51,6 +51,11 @@ TRANSITION_CONFIG_PATH = Path(__file__).resolve().parent / "transition_scores.js
 SCHEDULE_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json"
 UPCOMING_GAMES_WINDOW_DAYS = 2
 UPCOMING_GAMES_CACHE_SECONDS = 600
+POLYMARKET_CACHE_PATH = Path(__file__).resolve().parent / "polymarket_odds_cache.json"
+POLYMARKET_CACHE_TTL_SECONDS = 300
+BETTING_CONFIG_PATH = Path(__file__).resolve().parent / "betting_config.json"
+BET_LOG_PATH = Path(__file__).resolve().parent / "bet_log.json"
+POLYMARKET_FAST_POLL_INTERVAL = 0.5
 INITIAL_REPORT_LOOKBACK_INTERVALS = 96
 STATUS_ORDER = ["Out", "Doubtful", "Questionable", "Probable", "Available"]
 TRANSITION_TYPE_ORDER = ["added", "status_change", "removed"]
@@ -111,6 +116,10 @@ class AppState:
         self.last_report_at: str = ""
         self.last_fetch: datetime | None = None
         self.last_upcoming_games_fetch: datetime | None = None
+        self.auto_trade_enabled: bool = False
+        self.bet_threshold: float = 10.0
+        self.bet_log: list[dict] = []
+        self.polymarket_live_odds: dict = {}
         self.lock = threading.Lock()
 
 state = AppState()
@@ -124,6 +133,11 @@ class PlayerDbEntry(BaseModel):
 
 class PlayerDbDelete(BaseModel):
     player_name: str
+
+
+class BettingConfigUpdate(BaseModel):
+    auto_trade_enabled: bool
+    threshold: float
 
 
 class TransitionConfigEntry(BaseModel):
@@ -195,6 +209,57 @@ def _load_news_log() -> list[dict]:
 def _save_news_log(rows: list[dict]) -> None:
     with NEWS_LOG_PATH.open("w", encoding="utf-8") as f:
         json.dump(rows, f, ensure_ascii=True, indent=2)
+
+
+def _load_betting_config() -> dict:
+    if not BETTING_CONFIG_PATH.exists():
+        return {"auto_trade_enabled": False, "threshold": 10.0}
+    try:
+        with BETTING_CONFIG_PATH.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {
+            "auto_trade_enabled": bool(data.get("auto_trade_enabled", False)),
+            "threshold": float(data.get("threshold", 10.0)),
+        }
+    except Exception:
+        return {"auto_trade_enabled": False, "threshold": 10.0}
+
+
+def _save_betting_config(config: dict) -> None:
+    with BETTING_CONFIG_PATH.open("w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=True, indent=2)
+
+
+def _load_bet_log() -> list[dict]:
+    if not BET_LOG_PATH.exists():
+        return []
+    try:
+        with BET_LOG_PATH.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _save_bet_log(rows: list[dict]) -> None:
+    with BET_LOG_PATH.open("w", encoding="utf-8") as f:
+        json.dump(rows, f, ensure_ascii=True, indent=2)
+
+
+def _load_polymarket_cache() -> dict:
+    if not POLYMARKET_CACHE_PATH.exists():
+        return {}
+    try:
+        with POLYMARKET_CACHE_PATH.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_polymarket_cache(cache: dict) -> None:
+    with POLYMARKET_CACHE_PATH.open("w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=True, indent=2)
 
 
 def _transition_key(row: dict) -> str:
@@ -737,6 +802,327 @@ def _diff(old: list[dict], new: list[dict], report_at: str) -> list[dict]:
     return notifications
 
 
+def _build_polymarket_slug(game: dict) -> str:
+    away = str(game.get("away_tricode", "")).strip().lower()
+    home = str(game.get("home_tricode", "")).strip().lower()
+    game_dt = str(game.get("game_datetime", ""))
+    if not away or not home or not game_dt:
+        return ""
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", game_dt)
+    if not m:
+        return ""
+    return f"nba-{away}-{home}-{m.group(1)}-{m.group(2)}-{m.group(3)}"
+
+
+def _fetch_polymarket_for_slug(slug: str) -> dict | None:
+    try:
+        resp = httpx.get(
+            GAMMA_API_URL,
+            params={"slug": slug},
+            timeout=10.0,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        resp.raise_for_status()
+        events = resp.json()
+        if not events:
+            return None
+        evt = events[0]
+        markets = evt.get("markets") or []
+        return {
+            "title": evt.get("title", ""),
+            "slug": slug,
+            "markets": [
+                {
+                    "question": m.get("question", ""),
+                    "type": m.get("sportsMarketType", ""),
+                    "groupItemTitle": m.get("groupItemTitle", ""),
+                    "outcomes": json.loads(m["outcomes"]) if isinstance(m.get("outcomes"), str) else (m.get("outcomes") or []),
+                    "prices": json.loads(m["outcomePrices"]) if isinstance(m.get("outcomePrices"), str) else (m.get("outcomePrices") or []),
+                    "line": m.get("line"),
+                }
+                for m in markets
+                if m.get("sportsMarketType") in ("moneyline", "spreads", "totals", "first_half_moneyline", "first_half_spreads", "first_half_totals")
+            ],
+            "fetched_at": time.time(),
+        }
+    except Exception as exc:
+        log.warning(f"Polymarket fetch error for {slug}: {exc}")
+        return None
+
+
+def _polymarket_poll_loop():
+    while True:
+        try:
+            games = _get_upcoming_games()
+            slugs = []
+            for game in games:
+                slug = _build_polymarket_slug(game)
+                if slug:
+                    slugs.append(slug)
+            if slugs:
+                delay_per = max(0.05, POLYMARKET_FAST_POLL_INTERVAL / len(slugs))
+                for slug in slugs:
+                    data = _fetch_polymarket_for_slug(slug)
+                    if data:
+                        with state.lock:
+                            state.polymarket_live_odds[slug] = data
+                    time.sleep(delay_per)
+            else:
+                time.sleep(POLYMARKET_FAST_POLL_INTERVAL)
+        except Exception as exc:
+            log.warning(f"Polymarket poll loop error: {exc}")
+            time.sleep(POLYMARKET_FAST_POLL_INTERVAL)
+
+
+def _pick_best_market(slug: str) -> dict | None:
+    with state.lock:
+        odds_data = state.polymarket_live_odds.get(slug)
+    if not odds_data:
+        return None
+    markets = odds_data.get("markets", [])
+    best = None
+    best_closeness = float("inf")
+    for m in markets:
+        mtype = m.get("type", "")
+        if mtype not in ("moneyline", "spreads"):
+            continue
+        prices = m.get("prices", [])
+        if not prices:
+            continue
+        closeness = min(abs(float(p) - 0.5) for p in prices)
+        if closeness < best_closeness:
+            best_closeness = closeness
+            best = {
+                "market_type": mtype,
+                "question": m.get("question", ""),
+                "outcomes": m.get("outcomes", []),
+                "prices": prices,
+                "closeness": round(closeness, 4),
+            }
+    return best
+
+
+def _normalize_name_tokens(value: str) -> list[str]:
+    return [t for t in re.sub(r"[''`.]+", "", value.lower()).split() if re.match(r"^[a-z0-9]+$", t)]
+
+
+def _player_name_lookup_keys(value: str) -> list[str]:
+    tokens = _normalize_name_tokens(value.strip())
+    if not tokens:
+        return []
+    keys = set()
+    keys.add(" ".join(tokens))
+    keys.add(" ".join(sorted(tokens)))
+    if "," in value:
+        parts = [p.strip() for p in value.split(",") if p.strip()]
+        if len(parts) >= 2:
+            reordered = _normalize_name_tokens(" ".join(parts[1:]) + " " + parts[0])
+            keys.add(" ".join(reordered))
+            keys.add(" ".join(sorted(reordered)))
+    return list(keys)
+
+
+def _build_latest_batch() -> list[dict]:
+    players = _load_players_db()
+    importance_map: dict[str, int] = {}
+    for row in players:
+        imp = int(row.get("importance", 0))
+        for key in _player_name_lookup_keys(row.get("player_name", "")):
+            if imp > importance_map.get(key, 0):
+                importance_map[key] = imp
+
+    with state.lock:
+        transition_configs = list(state.transition_configs)
+        news = list(state.news_log)
+        upcoming = list(state.upcoming_games)
+
+    transition_map: dict[str, int] = {}
+    for row in transition_configs:
+        k = f"{row['transition_type']}|{row['from_state']}|{row['to_state']}"
+        transition_map[k] = int(row.get("score", 0))
+
+    valid_game_keys = set()
+    for game in upcoming:
+        gid = game.get("game_id", "")
+        if gid:
+            valid_game_keys.add(f"id:{gid}")
+        gdt = game.get("game_datetime", "")
+        gm = game.get("matchup", "")
+        if gdt and gm:
+            valid_game_keys.add(f"slot:{gdt}|{gm}")
+
+    now_ms = time.time() * 1000
+    two_days_ms = 2 * 24 * 60 * 60 * 1000
+
+    def _time_value(v: str) -> float | None:
+        if not v:
+            return None
+        try:
+            dt = datetime.fromisoformat(v.replace("Z", "+00:00"))
+            return dt.timestamp() * 1000
+        except Exception:
+            return None
+
+    def _canonical_game_key(row: dict) -> str:
+        gid = row.get("game_id", "")
+        if gid:
+            return f"id:{gid}"
+        gdt = row.get("scheduled_game_datetime", "")
+        gm = row.get("scheduled_matchup", "")
+        if gdt and gm:
+            return f"slot:{gdt}|{gm}"
+        return ""
+
+    grouped: dict[str, dict] = {}
+    for row in news:
+        game_key = _canonical_game_key(row)
+        if not game_key or game_key not in valid_game_keys:
+            continue
+        game_time_ms = _time_value(row.get("scheduled_game_datetime", "") or row.get("game_datetime_et", ""))
+        if game_time_ms is None or game_time_ms < now_ms or game_time_ms > now_ms + two_days_ms:
+            continue
+        if not row.get("away_tricode") or not row.get("home_tricode") or not row.get("team_tricode") or not row.get("opponent_tricode"):
+            continue
+
+        # Score the row
+        lookup_keys = _player_name_lookup_keys(row.get("player", ""))
+        player_importance = 0
+        for k in lookup_keys:
+            v = importance_map.get(k, 0)
+            if v > player_importance:
+                player_importance = v
+
+        rtype = row.get("type", "")
+        if rtype == "added":
+            t_type, t_from, t_to = "added", row.get("from_status", "Not On Report"), row.get("to_status", "") or row.get("status", "")
+        elif rtype == "removed":
+            t_type, t_from, t_to = "removed", row.get("from_status", "") or row.get("status", ""), row.get("to_status", "Removed")
+        elif rtype == "status_change":
+            t_type, t_from, t_to = "status_change", row.get("from_status", ""), row.get("to_status", "") or row.get("status", "")
+        else:
+            t_type, t_from, t_to = rtype, row.get("from_status", ""), row.get("to_status", "")
+
+        transition_score = transition_map.get(f"{t_type}|{t_from}|{t_to}", 0)
+        score = 0.0 if rtype == "injury_change" or not player_importance else round(player_importance ** 2 * transition_score / 100, 2)
+
+        credited_team = ""
+        own_team = row.get("team_tricode", "")
+        opponent_team = row.get("opponent_tricode", "")
+        if score > 0:
+            credited_team = own_team
+        elif score < 0:
+            credited_team = opponent_team
+
+        ts_at = row.get("timestamp_at", "")
+        bucket_ms = (int(_time_value(ts_at) or now_ms) // 5000) * 5000
+        batch_key = f"{bucket_ms}|{game_key}"
+
+        if batch_key not in grouped:
+            grouped[batch_key] = {
+                "key": batch_key,
+                "game_id": row.get("game_id", ""),
+                "batch_time": datetime.fromtimestamp(bucket_ms / 1000, tz=ET).isoformat(),
+                "game_datetime_et": row.get("scheduled_game_datetime", "") or row.get("game_datetime_et", ""),
+                "matchup": row.get("scheduled_matchup", "") or row.get("matchup", ""),
+                "away_tricode": row.get("away_tricode", ""),
+                "home_tricode": row.get("home_tricode", ""),
+                "away_score": 0.0,
+                "home_score": 0.0,
+                "items": [],
+            }
+
+        g = grouped[batch_key]
+        impact_value = abs(score)
+        if credited_team and impact_value:
+            if credited_team == g["away_tricode"]:
+                g["away_score"] = round(g["away_score"] + impact_value, 2)
+            if credited_team == g["home_tricode"]:
+                g["home_score"] = round(g["home_score"] + impact_value, 2)
+        g["items"].append({**row, "score": score, "credited_team": credited_team, "impact_value": round(impact_value, 2)})
+
+    batches = []
+    for g in grouped.values():
+        edge = round(g["home_score"] - g["away_score"], 2)
+        batches.append({**g, "edge_score": edge})
+
+    batches.sort(key=lambda b: (_time_value(b["batch_time"]) or 0), reverse=True)
+    return batches
+
+
+def _evaluate_auto_trade():
+    with state.lock:
+        if not state.auto_trade_enabled:
+            return
+        threshold = state.bet_threshold
+
+    batches = _build_latest_batch()
+    if not batches:
+        return
+
+    latest_batch_time = batches[0]["batch_time"] if batches else None
+    if not latest_batch_time:
+        return
+
+    # Only consider batches from the most recent batch_time
+    latest_batches = [b for b in batches if b["batch_time"] == latest_batch_time]
+
+    for batch in latest_batches:
+        edge_score = batch.get("edge_score", 0)
+        if abs(edge_score) < threshold:
+            continue
+
+        game_id = batch.get("game_id", "") or batch.get("key", "")
+        batch_time = batch.get("batch_time", "")
+        dedup_key = f"{batch_time}|{game_id}"
+
+        with state.lock:
+            already_logged = any(
+                entry.get("_dedup_key") == dedup_key
+                for entry in state.bet_log
+            )
+        if already_logged:
+            continue
+
+        profitable_team = batch["home_tricode"] if edge_score > 0 else batch["away_tricode"]
+        slug = ""
+        for game in _get_upcoming_games():
+            s = _build_polymarket_slug(game)
+            if s and (
+                (game.get("away_tricode") == batch.get("away_tricode") and game.get("home_tricode") == batch.get("home_tricode"))
+            ):
+                slug = s
+                break
+
+        market_info = _pick_best_market(slug) if slug else None
+
+        bet_entry = {
+            "id": f"bet-{int(time.time() * 1000)}",
+            "timestamp": datetime.now(ET).isoformat(),
+            "batch_time": batch_time,
+            "game_id": game_id,
+            "matchup": batch.get("matchup", ""),
+            "away_tricode": batch.get("away_tricode", ""),
+            "home_tricode": batch.get("home_tricode", ""),
+            "edge_score": edge_score,
+            "threshold": threshold,
+            "profitable_team": profitable_team,
+            "market_type": market_info["market_type"] if market_info else "",
+            "market_question": market_info["question"] if market_info else "",
+            "market_outcomes": market_info["outcomes"] if market_info else [],
+            "market_prices": market_info["prices"] if market_info else [],
+            "market_closeness": market_info["closeness"] if market_info else None,
+            "status": "logged",
+            "_dedup_key": dedup_key,
+        }
+
+        with state.lock:
+            state.bet_log.insert(0, bet_entry)
+            state.bet_log = state.bet_log[:500]
+            _save_bet_log(state.bet_log)
+
+        log.info(f"Auto-trade logged: {batch.get('matchup', '')} edge={edge_score} team={profitable_team}")
+
+
 def _poll_loop():
     while True:
         sleep_seconds = POLL_SECONDS
@@ -778,6 +1164,10 @@ def _poll_loop():
                                 state.news_log = state.news_log[:5000]
                                 _save_news_log(state.news_log)
                                 log.info(f"{len(changes)} changes detected")
+                                try:
+                                    _evaluate_auto_trade()
+                                except Exception as ate:
+                                    log.error(f"Auto-trade eval error: {ate}")
                             else:
                                 log.info("No changes")
                         else:
@@ -820,8 +1210,14 @@ def startup():
     with state.lock:
         state.news_log = _load_news_log()
         state.transition_configs = _load_transition_configs()
+        betting_cfg = _load_betting_config()
+        state.auto_trade_enabled = betting_cfg["auto_trade_enabled"]
+        state.bet_threshold = betting_cfg["threshold"]
+        state.bet_log = _load_bet_log()
     t = threading.Thread(target=_poll_loop, daemon=True)
     t.start()
+    t2 = threading.Thread(target=_polymarket_poll_loop, daemon=True)
+    t2.start()
 
 
 @app.get("/")
@@ -881,6 +1277,13 @@ def get_polymarket_game(slug: str = ""):
     slug = slug.strip()
     if not slug:
         raise HTTPException(status_code=400, detail="slug is required")
+
+    cache = _load_polymarket_cache()
+    entry = cache.get(slug)
+    now = time.time()
+    if entry and now - entry.get("fetched_at", 0) < POLYMARKET_CACHE_TTL_SECONDS:
+        return JSONResponse(entry["data"])
+
     try:
         resp = httpx.get(
             GAMMA_API_URL,
@@ -891,12 +1294,14 @@ def get_polymarket_game(slug: str = ""):
         resp.raise_for_status()
         events = resp.json()
     except Exception as exc:
+        if entry:
+            return JSONResponse(entry["data"])
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     if not events:
         raise HTTPException(status_code=404, detail="event not found")
     evt = events[0]
     markets = evt.get("markets") or []
-    return JSONResponse({
+    result = {
         "title": evt.get("title", ""),
         "slug": slug,
         "markets": [
@@ -911,7 +1316,12 @@ def get_polymarket_game(slug: str = ""):
             for m in markets
             if m.get("sportsMarketType") in ("moneyline", "spreads", "totals", "first_half_moneyline", "first_half_spreads", "first_half_totals")
         ],
-    })
+    }
+
+    cache[slug] = {"fetched_at": now, "data": result}
+    _save_polymarket_cache(cache)
+
+    return JSONResponse(result)
 
 
 @app.get("/api/news-log")
@@ -1009,6 +1419,54 @@ def upsert_player_db(entry: PlayerDbEntry):
         "mode": "updated" if updated else "added",
         "player": normalized,
     })
+
+
+@app.get("/api/betting-config")
+def get_betting_config():
+    with state.lock:
+        return JSONResponse({
+            "auto_trade_enabled": state.auto_trade_enabled,
+            "threshold": state.bet_threshold,
+        })
+
+
+@app.post("/api/betting-config/update")
+def update_betting_config(payload: BettingConfigUpdate):
+    with state.lock:
+        state.auto_trade_enabled = payload.auto_trade_enabled
+        state.bet_threshold = payload.threshold
+        config = {
+            "auto_trade_enabled": state.auto_trade_enabled,
+            "threshold": state.bet_threshold,
+        }
+        _save_betting_config(config)
+    return JSONResponse({"ok": True, **config})
+
+
+@app.get("/api/bet-log")
+def get_bet_log():
+    with state.lock:
+        return JSONResponse({
+            "rows": state.bet_log,
+            "count": len(state.bet_log),
+        })
+
+
+@app.get("/api/clear-bet-log")
+def clear_bet_log():
+    with state.lock:
+        state.bet_log = []
+        _save_bet_log(state.bet_log)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/polymarket-live")
+def get_polymarket_live():
+    with state.lock:
+        return JSONResponse({
+            "odds": dict(state.polymarket_live_odds),
+            "count": len(state.polymarket_live_odds),
+        })
 
 
 @app.post("/api/players-db/delete")

@@ -1,0 +1,454 @@
+{
+  "nba-orl-bos-2026-04-12": {
+    "fetched_at": 1776020199.4435232,
+    "data": {
+      "title": "Magic vs. Celtics",
+      "slug": "nba-orl-bos-2026-04-12",
+      "markets": [
+        {
+          "question": "Magic vs. Celtics",
+          "type": "moneyline",
+          "groupItemTitle": "",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.845",
+            "0.155"
+          ],
+          "line": null
+        },
+        {
+          "question": "Spread: Magic (-13.5)",
+          "type": "spreads",
+          "groupItemTitle": "Spread -13.5",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.475",
+            "0.525"
+          ],
+          "line": -13.5
+        },
+        {
+          "question": "1H Spread: Magic (-7.5)",
+          "type": "first_half_spreads",
+          "groupItemTitle": "1H Spread -7.5",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.5",
+            "0.5"
+          ],
+          "line": 7.5
+        },
+        {
+          "question": "Spread: Magic (-12.5)",
+          "type": "spreads",
+          "groupItemTitle": "Spread -12.5",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.515",
+            "0.485"
+          ],
+          "line": -12.5
+        },
+        {
+          "question": "Magic vs. Celtics: O/U 221.5",
+          "type": "totals",
+          "groupItemTitle": "O/U 221.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.51",
+            "0.49"
+          ],
+          "line": 221.5
+        },
+        {
+          "question": "Magic vs. Celtics: O/U 220.5",
+          "type": "totals",
+          "groupItemTitle": "O/U 220.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.535",
+            "0.465"
+          ],
+          "line": 220.5
+        },
+        {
+          "question": "Magic vs. Celtics: O/U 219.5",
+          "type": "totals",
+          "groupItemTitle": "O/U 219.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.545",
+            "0.455"
+          ],
+          "line": 219.5
+        },
+        {
+          "question": "Spread: Magic (-2.5)",
+          "type": "spreads",
+          "groupItemTitle": "Spread -2.5",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.79",
+            "0.21"
+          ],
+          "line": -2.5
+        },
+        {
+          "question": "Magic vs. Celtics: O/U 216.5",
+          "type": "totals",
+          "groupItemTitle": "O/U 216.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.625",
+            "0.375"
+          ],
+          "line": 216.5
+        },
+        {
+          "question": "Spread: Magic (-3.5)",
+          "type": "spreads",
+          "groupItemTitle": "Spread -3.5",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.775",
+            "0.225"
+          ],
+          "line": -3.5
+        },
+        {
+          "question": "Spread: Magic (-4.5)",
+          "type": "spreads",
+          "groupItemTitle": "Spread -4.5",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.755",
+            "0.245"
+          ],
+          "line": -4.5
+        },
+        {
+          "question": "Magic vs. Celtics: O/U 217.5",
+          "type": "totals",
+          "groupItemTitle": "O/U 217.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.61",
+            "0.39"
+          ],
+          "line": 217.5
+        },
+        {
+          "question": "Magic vs. Celtics: O/U 218.5",
+          "type": "totals",
+          "groupItemTitle": "O/U 218.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.57",
+            "0.43"
+          ],
+          "line": 218.5
+        },
+        {
+          "question": "Spread: Magic (-9.5)",
+          "type": "spreads",
+          "groupItemTitle": "Spread -9.5",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.605",
+            "0.395"
+          ],
+          "line": -9.5
+        },
+        {
+          "question": "Spread: Magic (-8.5)",
+          "type": "spreads",
+          "groupItemTitle": "Spread -8.5",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.635",
+            "0.365"
+          ],
+          "line": -8.5
+        },
+        {
+          "question": "Spread: Magic (-10.5)",
+          "type": "spreads",
+          "groupItemTitle": "Spread -10.5",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.575",
+            "0.425"
+          ],
+          "line": -10.5
+        },
+        {
+          "question": "Spread: Magic (-11.5)",
+          "type": "spreads",
+          "groupItemTitle": "Spread -11.5",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.555",
+            "0.445"
+          ],
+          "line": -11.5
+        },
+        {
+          "question": "1H Spread: Magic (-6.5)",
+          "type": "first_half_spreads",
+          "groupItemTitle": "1H Spread -6.5",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.54",
+            "0.46"
+          ],
+          "line": 6.5
+        },
+        {
+          "question": "Magic vs. Celtics: 1H O/U 112.5",
+          "type": "first_half_totals",
+          "groupItemTitle": "1H O/U 112.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.545",
+            "0.455"
+          ],
+          "line": 112.5
+        },
+        {
+          "question": "Magic vs. Celtics: 1H Moneyline",
+          "type": "first_half_moneyline",
+          "groupItemTitle": "1H Moneyline",
+          "outcomes": [
+            "Magic",
+            "Celtics"
+          ],
+          "prices": [
+            "0.78",
+            "0.22"
+          ],
+          "line": null
+        }
+      ]
+    }
+  },
+  "nba-chi-dal-2026-04-12": {
+    "fetched_at": 1776018451.7034628,
+    "data": {
+      "title": "Bulls vs. Mavericks",
+      "slug": "nba-chi-dal-2026-04-12",
+      "markets": [
+        {
+          "question": "Bulls vs. Mavericks",
+          "type": "moneyline",
+          "groupItemTitle": "",
+          "outcomes": [
+            "Bulls",
+            "Mavericks"
+          ],
+          "prices": [
+            "0.295",
+            "0.705"
+          ],
+          "line": null
+        },
+        {
+          "question": "Bulls vs. Mavericks: O/U 248.5",
+          "type": "totals",
+          "groupItemTitle": "O/U 248.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.505",
+            "0.495"
+          ],
+          "line": 248.5
+        },
+        {
+          "question": "Bulls vs. Mavericks: 1H O/U 120.5",
+          "type": "first_half_totals",
+          "groupItemTitle": "1H O/U 120.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.51",
+            "0.49"
+          ],
+          "line": 120.5
+        },
+        {
+          "question": "Spread: Mavericks (-7.5)",
+          "type": "spreads",
+          "groupItemTitle": "Spread -7.5",
+          "outcomes": [
+            "Mavericks",
+            "Bulls"
+          ],
+          "prices": [
+            "0.475",
+            "0.525"
+          ],
+          "line": -7.5
+        },
+        {
+          "question": "Bulls vs. Mavericks: O/U 245.5",
+          "type": "totals",
+          "groupItemTitle": "O/U 245.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.565",
+            "0.435"
+          ],
+          "line": 245.5
+        },
+        {
+          "question": "Spread: Mavericks (-6.5)",
+          "type": "spreads",
+          "groupItemTitle": "Spread -6.5",
+          "outcomes": [
+            "Mavericks",
+            "Bulls"
+          ],
+          "prices": [
+            "0.505",
+            "0.495"
+          ],
+          "line": -6.5
+        },
+        {
+          "question": "Bulls vs. Mavericks: O/U 244.5",
+          "type": "totals",
+          "groupItemTitle": "O/U 244.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.615",
+            "0.385"
+          ],
+          "line": 244.5
+        },
+        {
+          "question": "Bulls vs. Mavericks: O/U 246.5",
+          "type": "totals",
+          "groupItemTitle": "O/U 246.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.555",
+            "0.445"
+          ],
+          "line": 246.5
+        },
+        {
+          "question": "1H Spread: Mavericks (-3.5)",
+          "type": "first_half_spreads",
+          "groupItemTitle": "1H Spread -3.5",
+          "outcomes": [
+            "Mavericks",
+            "Bulls"
+          ],
+          "prices": [
+            "0.51",
+            "0.49"
+          ],
+          "line": 3.5
+        },
+        {
+          "question": "Bulls vs. Mavericks: 1H O/U 119.5",
+          "type": "first_half_totals",
+          "groupItemTitle": "1H O/U 119.5",
+          "outcomes": [
+            "Over",
+            "Under"
+          ],
+          "prices": [
+            "0.545",
+            "0.455"
+          ],
+          "line": 119.5
+        },
+        {
+          "question": "Bulls vs. Mavericks: 1H Moneyline",
+          "type": "first_half_moneyline",
+          "groupItemTitle": "1H Moneyline",
+          "outcomes": [
+            "Bulls",
+            "Mavericks"
+          ],
+          "prices": [
+            "0.345",
+            "0.655"
+          ],
+          "line": null
+        }
+      ]
+    }
+  }
+}
