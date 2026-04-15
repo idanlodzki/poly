@@ -1,0 +1,28 @@
+[
+  {
+    "id": "bet-1776021198454",
+    "timestamp": "2026-04-12T15:13:18.454125-04:00",
+    "batch_time": "2026-04-12T15:13:15-04:00",
+    "game_id": "0022501191",
+    "matchup": "MIL @ PHI",
+    "away_tricode": "MIL",
+    "home_tricode": "PHI",
+    "edge_score": 4.0,
+    "threshold": 2.0,
+    "profitable_team": "PHI",
+    "market_type": "spreads",
+    "market_question": "Spread: 76ers (-15.5)",
+    "market_outcomes": [
+      "76ers",
+      "Bucks"
+    ],
+    "market_prices": [
+      "0.495",
+      "0.505"
+    ],
+    "market_closeness": 0.005,
+    "status": "logged",
+    "simulated": true,
+    "_dedup_key": "2026-04-12T15:13:15-04:00|0022501191"
+  }
+]
