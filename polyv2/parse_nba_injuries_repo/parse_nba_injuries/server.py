@@ -140,6 +140,11 @@ class BettingConfigUpdate(BaseModel):
     threshold: float
 
 
+class SimulateInjuryRequest(BaseModel):
+    player_name: str
+    target_status: str
+
+
 class TransitionConfigEntry(BaseModel):
     transition_type: str
     from_state: str
@@ -1049,9 +1054,9 @@ def _build_latest_batch() -> list[dict]:
     return batches
 
 
-def _evaluate_auto_trade():
+def _evaluate_auto_trade(force: bool = False):
     with state.lock:
-        if not state.auto_trade_enabled:
+        if not force and not state.auto_trade_enabled:
             return
         threshold = state.bet_threshold
 
@@ -1095,6 +1100,8 @@ def _evaluate_auto_trade():
 
         market_info = _pick_best_market(slug) if slug else None
 
+        is_simulated = any(item.get("simulated") for item in batch.get("items", []))
+
         bet_entry = {
             "id": f"bet-{int(time.time() * 1000)}",
             "timestamp": datetime.now(ET).isoformat(),
@@ -1112,6 +1119,7 @@ def _evaluate_auto_trade():
             "market_prices": market_info["prices"] if market_info else [],
             "market_closeness": market_info["closeness"] if market_info else None,
             "status": "logged",
+            "simulated": is_simulated,
             "_dedup_key": dedup_key,
         }
 
@@ -1483,3 +1491,123 @@ def delete_player_db(payload: PlayerDbDelete):
         _save_players_db(new_rows)
 
     return JSONResponse({"ok": True, "player_name": player_name})
+
+
+VALID_SIM_STATUSES = {"Out", "Doubtful", "Questionable", "Probable", "Available", "Remove from report"}
+
+
+@app.post("/api/simulate-injury")
+def simulate_injury(payload: SimulateInjuryRequest):
+    player_name = payload.player_name.strip()
+    target_status = payload.target_status.strip()
+
+    if not player_name:
+        raise HTTPException(status_code=400, detail="player_name is required")
+    if target_status not in VALID_SIM_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid target_status. Must be one of: {', '.join(sorted(VALID_SIM_STATUSES))}")
+
+    # Validate player exists in DB
+    players = _load_players_db()
+    matched_player = None
+    for p in players:
+        if p["player_name"].lower() == player_name.lower():
+            matched_player = p
+            break
+    if not matched_player:
+        raise HTTPException(status_code=400, detail=f"Player '{player_name}' not found in DB")
+
+    team_name = matched_player["nba_team"]
+
+    # Determine from_status by scanning current records
+    from_status = None
+    with state.lock:
+        for r in state.records:
+            if r["player"].lower() == player_name.lower():
+                from_status = r.get("status", "")
+                break
+
+    on_report = from_status is not None
+    if not on_report:
+        from_status = NOT_ON_REPORT_STATE
+
+    # Derive transition type
+    if not on_report and target_status != "Remove from report":
+        transition_type = "added"
+        detail = f"[SIM] Added — {target_status}"
+        to_status = target_status
+    elif on_report and target_status == "Remove from report":
+        transition_type = "removed"
+        detail = "[SIM] Removed from report"
+        to_status = REMOVED_STATE
+    elif on_report and target_status != "Remove from report" and from_status != target_status:
+        transition_type = "status_change"
+        detail = f"[SIM] {from_status} → {target_status}"
+        to_status = target_status
+    else:
+        if not on_report and target_status == "Remove from report":
+            raise HTTPException(status_code=400, detail="Player is not on report — cannot remove")
+        raise HTTPException(status_code=400, detail=f"Player already has status '{from_status}' — no change")
+
+    # Match to upcoming game
+    upcoming = _get_upcoming_games()
+    team_tricode = _team_tricode_from_name(team_name, upcoming)
+
+    # Build a fake record to feed _match_schedule_game
+    fake_record = {"team": team_name, "matchup": "", "game_datetime_et": None}
+    matched_game = _match_schedule_game(fake_record, upcoming)
+    if not matched_game:
+        raise HTTPException(status_code=400, detail=f"No upcoming game found for {team_name}")
+
+    away_tricode = str(matched_game.get("away_tricode", ""))
+    home_tricode = str(matched_game.get("home_tricode", ""))
+    if not team_tricode:
+        if team_name == matched_game.get("away_team"):
+            team_tricode = away_tricode
+        elif team_name == matched_game.get("home_team"):
+            team_tricode = home_tricode
+
+    opponent_tricode = ""
+    if team_tricode == away_tricode:
+        opponent_tricode = home_tricode
+    elif team_tricode == home_tricode:
+        opponent_tricode = away_tricode
+
+    tone = _event_tone(transition_type, from_status if on_report else "", to_status if to_status != REMOVED_STATE else "")
+
+    now_iso = datetime.now(ET).isoformat()
+    entry = {
+        "type": transition_type,
+        "player": matched_player["player_name"],
+        "team": team_name,
+        "status": to_status if to_status != REMOVED_STATE else (from_status if on_report else ""),
+        "from_status": from_status,
+        "to_status": to_status,
+        "matchup": matched_game.get("matchup", ""),
+        "game_datetime_et": matched_game.get("game_datetime", ""),
+        "game_id": matched_game.get("game_id", ""),
+        "scheduled_game_datetime": matched_game.get("game_datetime", ""),
+        "scheduled_matchup": matched_game.get("matchup", ""),
+        "away_tricode": away_tricode,
+        "home_tricode": home_tricode,
+        "team_tricode": team_tricode,
+        "opponent_tricode": opponent_tricode,
+        "injury": "Simulated",
+        "tone": tone,
+        "detail": detail,
+        "timestamp_at": now_iso,
+        "simulated": True,
+    }
+
+    with state.lock:
+        state.news_log = [entry] + state.news_log
+        state.news_log = state.news_log[:5000]
+        _save_news_log(state.news_log)
+        state.notifications = [entry] + state.notifications
+        state.notifications = state.notifications[:500]
+
+    try:
+        _evaluate_auto_trade(force=True)
+    except Exception as exc:
+        log.error(f"Simulate auto-trade eval error: {exc}")
+
+    return JSONResponse({"ok": True, "entry": entry})

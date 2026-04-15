@@ -848,6 +848,69 @@
     font-weight: 600;
     font-size: 14px;
   }
+
+  /* ── Simulate injury card ── */
+  .simulate-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 22px;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border: 1px solid #fcd34d;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .simulate-card .sim-label {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #b45309;
+    white-space: nowrap;
+  }
+  .simulate-card select {
+    padding: 7px 10px;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--text);
+    background: #fff;
+  }
+  .simulate-card select:focus {
+    outline: none;
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.15);
+  }
+  .sim-btn {
+    padding: 7px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #f59e0b;
+    color: #fff;
+    transition: background 0.15s;
+  }
+  .sim-btn:hover { background: #d97706; }
+  .sim-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #simResult {
+    font-size: 13px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+  .sim-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #fef3c7;
+    color: #b45309;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
 </style>
 </head>
 <body>
@@ -998,6 +1061,24 @@
         <div style="margin-left:auto">
           <button class="clear-btn" id="clearBetLogBtn" style="padding:6px 14px;color:#dc2626;border-color:#fecaca">Clear History</button>
         </div>
+      </div>
+
+      <div class="simulate-card">
+        <span class="sim-label">Simulate Injury</span>
+        <select id="simPlayerSelect" style="min-width:200px">
+          <option value="">Pick player...</option>
+        </select>
+        <select id="simStatusSelect">
+          <option value="">Pick status...</option>
+          <option value="Out">Out</option>
+          <option value="Doubtful">Doubtful</option>
+          <option value="Questionable">Questionable</option>
+          <option value="Probable">Probable</option>
+          <option value="Available">Available</option>
+          <option value="Remove from report">Remove from report</option>
+        </select>
+        <button class="sim-btn" id="simulateBtn">Simulate</button>
+        <span id="simResult"></span>
       </div>
 
       <div id="lastTradePanel" class="last-trade-card" style="display:none">
@@ -2590,6 +2671,7 @@ async function fetchPlayersDb() {
     renderDbTeamFilter(playersDb);
     syncImportanceRangeDisplay();
     renderDbSuggestions();
+    populateSimPlayerDropdown();
     applyDbFilters();
     configureNewsImportanceFilter(newsRows);
     configureNewsScoreFilter(newsRows);
@@ -2745,6 +2827,56 @@ async function fetchBettingConfig() {
   }
 }
 
+function populateSimPlayerDropdown() {
+  const sel = document.getElementById('simPlayerSelect');
+  const prev = sel.value;
+  const names = [...new Set(playersDb.map(r => r.player_name))].sort();
+  sel.innerHTML = '<option value="">Pick player...</option>' +
+    names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  if (prev && names.includes(prev)) sel.value = prev;
+}
+
+async function simulateInjury() {
+  const playerName = document.getElementById('simPlayerSelect').value;
+  const targetStatus = document.getElementById('simStatusSelect').value;
+  const resultEl = document.getElementById('simResult');
+  const btn = document.getElementById('simulateBtn');
+
+  if (!playerName || !targetStatus) {
+    resultEl.style.color = '#dc2626';
+    resultEl.textContent = 'Pick a player and status first';
+    return;
+  }
+
+  btn.disabled = true;
+  resultEl.style.color = '#b45309';
+  resultEl.textContent = 'Simulating...';
+
+  try {
+    const res = await fetch('/api/simulate-injury', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player_name: playerName, target_status: targetStatus }),
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      resultEl.style.color = '#16a34a';
+      resultEl.textContent = `Injected: ${data.entry.detail}`;
+      fetchBetLog();
+      fetchNewsLog();
+      fetchNotifications();
+    } else {
+      resultEl.style.color = '#dc2626';
+      resultEl.textContent = data.detail || 'Error';
+    }
+  } catch (e) {
+    resultEl.style.color = '#dc2626';
+    resultEl.textContent = 'Network error';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function fetchBetLog() {
   try {
     const res = await fetch('/api/bet-log');
@@ -2783,7 +2915,7 @@ function renderBetLog() {
       <td>${escapeHtml(bet.market_type || 'N/A')}</td>
       <td style="font-size:12px">${oddsStr}</td>
       <td>${bet.market_closeness != null ? escapeHtml(bet.market_closeness.toFixed(4)) : 'N/A'}</td>
-      <td><span class="badge badge-available">${escapeHtml(bet.status || '')}</span></td>
+      <td><span class="badge badge-available">${escapeHtml(bet.status || '')}</span>${bet.simulated ? '<span class="sim-badge">SIM</span>' : ''}</td>
     </tr>`;
   }
 
@@ -2892,6 +3024,7 @@ document.getElementById('betThresholdInput').addEventListener('blur', () => {
   _bettingConfigDirty = false;
 });
 document.getElementById('clearBetLogBtn').addEventListener('click', clearBetLog);
+document.getElementById('simulateBtn').addEventListener('click', simulateInjury);
 document.getElementById('dbTeamFilterButton').addEventListener('click', (e) => {
   e.stopPropagation();
   toggleDbMenu('dbTeamFilterMenu');
