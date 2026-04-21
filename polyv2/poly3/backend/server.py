@@ -159,10 +159,12 @@ class AppState:
         self.bet_amount: float = 10.0
         self.bet_log: list[dict] = []
         self.auto_trade_armed_at: str = ""  # only trade batches newer than this
-        # Skip auto-trade on pure injury-report batches whose bucket time (ET hour)
-        # falls inside [block_hour_start, block_hour_end). News items still trade.
+        # Skip auto-trade on pure injury-report batches whose bucket time (ET)
+        # falls inside [start, end). News items still trade.
         self.bet_block_hour_start: int = 16
         self.bet_block_hour_end: int = 18
+        self.bet_block_minute_start: int = 0
+        self.bet_block_minute_end: int = 0
         self.twitter_injuries: dict = {}  # player_key → { status, timestamp }
         self.twitter_enabled: bool = True  # manual on/off
         self.twitter_blackout_until: float = 0  # epoch — skip tweet processing until this time

@@ -251,28 +251,41 @@ def save_transition_configs(entries: list[dict]) -> None:
 def load_betting_config() -> dict:
     conn = _get_conn()
     row = conn.execute(
-        "SELECT auto_trade_enabled, threshold, bet_amount, block_hour_start, block_hour_end FROM betting_config WHERE id = 1"
+        "SELECT auto_trade_enabled, threshold, bet_amount, "
+        "block_hour_start, block_hour_end, block_minute_start, block_minute_end "
+        "FROM betting_config WHERE id = 1"
     ).fetchone()
     if row is None:
-        return {"auto_trade_enabled": False, "threshold": 10.0, "bet_amount": 10.0, "block_hour_start": 16, "block_hour_end": 18}
+        return {
+            "auto_trade_enabled": False, "threshold": 10.0, "bet_amount": 10.0,
+            "block_hour_start": 16, "block_hour_end": 18,
+            "block_minute_start": 0, "block_minute_end": 0,
+        }
     return {
         "auto_trade_enabled": bool(row["auto_trade_enabled"]),
         "threshold": float(row["threshold"]),
         "bet_amount": float(row["bet_amount"]) if row["bet_amount"] is not None else 10.0,
         "block_hour_start": int(row["block_hour_start"]) if row["block_hour_start"] is not None else 16,
         "block_hour_end": int(row["block_hour_end"]) if row["block_hour_end"] is not None else 18,
+        "block_minute_start": int(row["block_minute_start"]) if row["block_minute_start"] is not None else 0,
+        "block_minute_end": int(row["block_minute_end"]) if row["block_minute_end"] is not None else 0,
     }
 
 
 def save_betting_config(enabled: bool, threshold: float, bet_amount: float = 10.0,
-                        block_hour_start: int = 16, block_hour_end: int = 18) -> None:
+                        block_hour_start: int = 16, block_hour_end: int = 18,
+                        block_minute_start: int = 0, block_minute_end: int = 0) -> None:
     conn = _get_conn()
     conn.execute(
-        "INSERT INTO betting_config (id, auto_trade_enabled, threshold, bet_amount, block_hour_start, block_hour_end) "
-        "VALUES (1, ?, ?, ?, ?, ?) "
+        "INSERT INTO betting_config (id, auto_trade_enabled, threshold, bet_amount, "
+        "block_hour_start, block_hour_end, block_minute_start, block_minute_end) "
+        "VALUES (1, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(id) DO UPDATE SET auto_trade_enabled = excluded.auto_trade_enabled, threshold = excluded.threshold, "
-        "bet_amount = excluded.bet_amount, block_hour_start = excluded.block_hour_start, block_hour_end = excluded.block_hour_end",
-        (int(enabled), threshold, bet_amount, int(block_hour_start), int(block_hour_end)),
+        "bet_amount = excluded.bet_amount, block_hour_start = excluded.block_hour_start, block_hour_end = excluded.block_hour_end, "
+        "block_minute_start = excluded.block_minute_start, block_minute_end = excluded.block_minute_end",
+        (int(enabled), threshold, bet_amount,
+         int(block_hour_start), int(block_hour_end),
+         int(block_minute_start), int(block_minute_end)),
     )
     conn.commit()
 
