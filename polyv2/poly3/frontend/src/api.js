@@ -68,11 +68,11 @@ export function fetchBettingConfig() {
   return fetch('/api/betting-config').then(json);
 }
 
-export function updateBettingConfig({ auto_trade_enabled, threshold, bet_amount }) {
+export function updateBettingConfig({ auto_trade_enabled, threshold, bet_amount, block_hour_start, block_hour_end }) {
   return fetch('/api/betting-config/update', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ auto_trade_enabled, threshold, bet_amount }),
+    body: JSON.stringify({ auto_trade_enabled, threshold, bet_amount, block_hour_start, block_hour_end }),
   }).then(json);
 }
 
@@ -107,4 +107,24 @@ export function sellPosition(positionId) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ position_id: positionId }),
   }).then(json);
+}
+
+export function fetchTweets() {
+  return fetch('/api/tweets').then(json);
+}
+
+export function clearTweets() {
+  return fetch('/api/clear-tweets').then(json);
+}
+
+export function fetchTwitterLog() {
+  return fetch('/api/twitter-log').then(json);
+}
+
+export function fetchTwitterStatus() {
+  return fetch('/api/twitter-status').then(json);
+}
+
+export function toggleTwitter() {
+  return fetch('/api/twitter-toggle').then(json);
 }

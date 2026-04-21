@@ -3,6 +3,7 @@ import React from 'react';
 const MAIN_NAV = [
   { key: 'injuries', icon: '\u2695', label: 'Injury Report' },
   { key: 'news', icon: '\u25A4', label: 'Caught News' },
+  { key: 'twitter', icon: '\u2709', label: 'Twitter Feed' },
   { key: 'games', icon: '\u25C9', label: 'Upcoming Games' },
   { key: 'teamNews', icon: '\u229E', label: 'Team News' },
   { key: 'positions', icon: '\u25B6', label: 'Positions' },

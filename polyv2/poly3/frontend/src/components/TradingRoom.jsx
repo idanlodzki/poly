@@ -12,7 +12,7 @@ import {
 import { teamColor, formatDateTime, scoreClass, formatScore } from '../utils.js';
 
 export default function TradingRoom({ refreshKey }) {
-  const [config, setConfig] = useState({ auto_trade_enabled: false, threshold: 0, bet_amount: 10 });
+  const [config, setConfig] = useState({ auto_trade_enabled: false, threshold: 0, bet_amount: 10, block_hour_start: 16, block_hour_end: 18 });
   const [betLog, setBetLog] = useState([]);
   const [playersDb, setPlayersDb] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,11 +26,20 @@ export default function TradingRoom({ refreshKey }) {
 
   const thresholdTimer = useRef(null);
   const betAmountTimer = useRef(null);
+  const blockStartTimer = useRef(null);
+  const blockEndTimer = useRef(null);
 
   const load = useCallback(() => {
     Promise.all([fetchBettingConfig(), fetchBetLog(), fetchPlayersDb()])
       .then(([cData, bData, pData]) => {
-        setConfig(cData || { auto_trade_enabled: false, threshold: 0, bet_amount: 10 });
+        setConfig({
+          auto_trade_enabled: false,
+          threshold: 0,
+          bet_amount: 10,
+          block_hour_start: 16,
+          block_hour_end: 18,
+          ...(cData || {}),
+        });
         setBetLog(bData.rows || []);
         setPlayersDb(pData.players || []);
       })
@@ -39,31 +48,57 @@ export default function TradingRoom({ refreshKey }) {
   }, []);
 
   useEffect(() => { load(); }, [refreshKey, load]);
-  useEffect(() => () => { if (thresholdTimer.current) clearTimeout(thresholdTimer.current); if (betAmountTimer.current) clearTimeout(betAmountTimer.current); }, []);
+  useEffect(() => () => {
+    if (thresholdTimer.current) clearTimeout(thresholdTimer.current);
+    if (betAmountTimer.current) clearTimeout(betAmountTimer.current);
+    if (blockStartTimer.current) clearTimeout(blockStartTimer.current);
+    if (blockEndTimer.current) clearTimeout(blockEndTimer.current);
+  }, []);
+
+  const pushConfig = (overrides) => updateBettingConfig({
+    auto_trade_enabled: config.auto_trade_enabled,
+    threshold: config.threshold,
+    bet_amount: config.bet_amount,
+    block_hour_start: config.block_hour_start,
+    block_hour_end: config.block_hour_end,
+    ...overrides,
+  });
 
   const handleToggle = useCallback(() => {
     const next = !config.auto_trade_enabled;
     setConfig((p) => ({ ...p, auto_trade_enabled: next }));
-    updateBettingConfig({ auto_trade_enabled: next, threshold: config.threshold, bet_amount: config.bet_amount });
+    pushConfig({ auto_trade_enabled: next });
   }, [config]);
 
   const handleThreshold = useCallback((value) => {
     const num = Number(value);
     setConfig((p) => ({ ...p, threshold: num }));
     if (thresholdTimer.current) clearTimeout(thresholdTimer.current);
-    thresholdTimer.current = setTimeout(() => {
-      updateBettingConfig({ auto_trade_enabled: config.auto_trade_enabled, threshold: num, bet_amount: config.bet_amount });
-    }, 600);
-  }, [config.auto_trade_enabled, config.bet_amount]);
+    thresholdTimer.current = setTimeout(() => { pushConfig({ threshold: num }); }, 600);
+  }, [config]);
 
   const handleBetAmount = useCallback((value) => {
     const num = Number(value);
     setConfig((p) => ({ ...p, bet_amount: num }));
     if (betAmountTimer.current) clearTimeout(betAmountTimer.current);
-    betAmountTimer.current = setTimeout(() => {
-      updateBettingConfig({ auto_trade_enabled: config.auto_trade_enabled, threshold: config.threshold, bet_amount: num });
-    }, 600);
-  }, [config.auto_trade_enabled, config.threshold]);
+    betAmountTimer.current = setTimeout(() => { pushConfig({ bet_amount: num }); }, 600);
+  }, [config]);
+
+  const clampHour = (v, max) => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
+
+  const handleBlockStart = useCallback((value) => {
+    const num = clampHour(value, 23);
+    setConfig((p) => ({ ...p, block_hour_start: num }));
+    if (blockStartTimer.current) clearTimeout(blockStartTimer.current);
+    blockStartTimer.current = setTimeout(() => { pushConfig({ block_hour_start: num }); }, 600);
+  }, [config]);
+
+  const handleBlockEnd = useCallback((value) => {
+    const num = clampHour(value, 24);
+    setConfig((p) => ({ ...p, block_hour_end: num }));
+    if (blockEndTimer.current) clearTimeout(blockEndTimer.current);
+    blockEndTimer.current = setTimeout(() => { pushConfig({ block_hour_end: num }); }, 600);
+  }, [config]);
 
   const handleSimulate = async () => {
     if (!simPlayer) { setSimResult('Select a player'); return; }
@@ -123,6 +158,20 @@ export default function TradingRoom({ refreshKey }) {
             <label style={{ fontSize: 13, color: '#64748b' }}>Bet $:</label>
             <input className="form-input" type="number" value={config.bet_amount}
               onChange={(e) => handleBetAmount(e.target.value)} style={{ width: 80 }} />
+          </div>
+
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            title="Skip auto-trade on pure injury-report batches whose ET hour falls in this window. News still trades."
+          >
+            <label style={{ fontSize: 13, color: '#64748b' }}>Block injury-report (ET):</label>
+            <input className="form-input" type="number" min={0} max={23}
+              value={config.block_hour_start}
+              onChange={(e) => handleBlockStart(e.target.value)} style={{ width: 60 }} />
+            <span style={{ fontSize: 13, color: '#64748b' }}>–</span>
+            <input className="form-input" type="number" min={0} max={24}
+              value={config.block_hour_end}
+              onChange={(e) => handleBlockEnd(e.target.value)} style={{ width: 60 }} />
           </div>
 
           <button className="btn btn-danger btn-sm" onClick={() => { clearBetLog().then(() => setBetLog([])); }}>

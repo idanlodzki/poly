@@ -9,6 +9,7 @@ import PlayerDatabase from './components/PlayerDatabase';
 import TransitionScores from './components/TransitionScores';
 import Positions from './components/Positions';
 import TradingRoom from './components/TradingRoom';
+import TwitterFeed from './components/TwitterFeed';
 import { fetchReport, fetchNotifications, clearNotifications, fetchPlayersDb, fetchTransitionConfig } from './api';
 import { formatDateTime } from './utils';
 
@@ -17,6 +18,7 @@ const PAGE_TITLES = {
   games: 'Upcoming Games',
   teamNews: 'Team Game News',
   news: 'Caught News',
+  twitter: 'Twitter Feed',
   players: 'Player Database',
   transitions: 'Transition Scores',
   positions: 'Positions',
@@ -84,6 +86,7 @@ export default function App() {
         </div>
         {activeTab === 'injuries' && <InjuryReport refreshKey={refreshKey} />}
         {activeTab === 'news' && <CaughtNews refreshKey={refreshKey} />}
+        {activeTab === 'twitter' && <TwitterFeed refreshKey={refreshKey} />}
         {activeTab === 'games' && <UpcomingGames refreshKey={refreshKey} />}
         {activeTab === 'teamNews' && <TeamGameNews refreshKey={refreshKey} />}
         {activeTab === 'positions' && <Positions refreshKey={refreshKey} />}
