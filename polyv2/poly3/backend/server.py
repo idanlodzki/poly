@@ -191,6 +191,8 @@ class BettingConfigUpdate(BaseModel):
     bet_amount: float = 10.0
     block_hour_start: int = 16
     block_hour_end: int = 18
+    block_minute_start: int = 0
+    block_minute_end: int = 0
 
 
 class SimulateInjuryRequest(BaseModel):
@@ -1126,8 +1128,11 @@ def _build_latest_batch() -> list[dict]:
     return batches
 
 
-def _is_blocked_injury_report_batch(batch: dict, block_start: int, block_end: int) -> bool:
-    if block_start == block_end:
+def _is_blocked_injury_report_batch(batch: dict, start_minute: int, end_minute: int) -> bool:
+    """start_minute/end_minute are minute-of-day in ET (0..1439). Wrap-around supported."""
+    start_minute = max(0, min(1439, int(start_minute)))
+    end_minute = max(0, min(1440, int(end_minute)))
+    if start_minute == end_minute:
         return False
     batch_time = batch.get("batch_time", "")
     if not batch_time:
@@ -1137,14 +1142,14 @@ def _is_blocked_injury_report_batch(batch: dict, block_start: int, block_end: in
     except Exception:
         return False
     try:
-        hour = dt.astimezone(ET).hour
+        et_dt = dt.astimezone(ET)
     except Exception:
-        hour = dt.hour
-    # Support wrap-around windows (e.g. 22–02)
-    if block_start < block_end:
-        in_window = block_start <= hour < block_end
+        et_dt = dt
+    minute_of_day = et_dt.hour * 60 + et_dt.minute
+    if start_minute < end_minute:
+        in_window = start_minute <= minute_of_day < end_minute
     else:
-        in_window = hour >= block_start or hour < block_end
+        in_window = minute_of_day >= start_minute or minute_of_day < end_minute
     if not in_window:
         return False
     items = batch.get("items", []) or []
@@ -1160,8 +1165,8 @@ def _evaluate_auto_trade(force: bool = False):
             return
         threshold = state.bet_threshold
         armed_at = state.auto_trade_armed_at
-        block_start = int(state.bet_block_hour_start)
-        block_end = int(state.bet_block_hour_end)
+        block_start_min = int(state.bet_block_hour_start) * 60 + int(state.bet_block_minute_start)
+        block_end_min = int(state.bet_block_hour_end) * 60 + int(state.bet_block_minute_end)
 
     batches = _build_latest_batch()
     if not batches:
@@ -1686,6 +1691,8 @@ def startup():
         state.bet_amount = betting_cfg.get("bet_amount", 10.0)
         state.bet_block_hour_start = int(betting_cfg.get("block_hour_start", 16))
         state.bet_block_hour_end = int(betting_cfg.get("block_hour_end", 18))
+        state.bet_block_minute_start = int(betting_cfg.get("block_minute_start", 0))
+        state.bet_block_minute_end = int(betting_cfg.get("block_minute_end", 0))
         state.bet_log = db.load_bet_log()
         # Arm watermark = now, so we never trade on old batches after restart
         state.auto_trade_armed_at = datetime.now(ET).isoformat()
