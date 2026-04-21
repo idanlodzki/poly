@@ -68,11 +68,19 @@ export function fetchBettingConfig() {
   return fetch('/api/betting-config').then(json);
 }
 
-export function updateBettingConfig({ auto_trade_enabled, threshold, bet_amount, block_hour_start, block_hour_end }) {
+export function updateBettingConfig({
+  auto_trade_enabled, threshold, bet_amount,
+  block_hour_start, block_hour_end,
+  block_minute_start, block_minute_end,
+}) {
   return fetch('/api/betting-config/update', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ auto_trade_enabled, threshold, bet_amount, block_hour_start, block_hour_end }),
+    body: JSON.stringify({
+      auto_trade_enabled, threshold, bet_amount,
+      block_hour_start, block_hour_end,
+      block_minute_start, block_minute_end,
+    }),
   }).then(json);
 }
 

@@ -12,7 +12,11 @@ import {
 import { teamColor, formatDateTime, scoreClass, formatScore } from '../utils.js';
 
 export default function TradingRoom({ refreshKey }) {
-  const [config, setConfig] = useState({ auto_trade_enabled: false, threshold: 0, bet_amount: 10, block_hour_start: 16, block_hour_end: 18 });
+  const [config, setConfig] = useState({
+    auto_trade_enabled: false, threshold: 0, bet_amount: 10,
+    block_hour_start: 16, block_hour_end: 18,
+    block_minute_start: 0, block_minute_end: 0,
+  });
   const [betLog, setBetLog] = useState([]);
   const [playersDb, setPlayersDb] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +42,8 @@ export default function TradingRoom({ refreshKey }) {
           bet_amount: 10,
           block_hour_start: 16,
           block_hour_end: 18,
+          block_minute_start: 0,
+          block_minute_end: 0,
           ...(cData || {}),
         });
         setBetLog(bData.rows || []);
@@ -61,6 +67,8 @@ export default function TradingRoom({ refreshKey }) {
     bet_amount: config.bet_amount,
     block_hour_start: config.block_hour_start,
     block_hour_end: config.block_hour_end,
+    block_minute_start: config.block_minute_start,
+    block_minute_end: config.block_minute_end,
     ...overrides,
   });
 
@@ -84,20 +92,33 @@ export default function TradingRoom({ refreshKey }) {
     betAmountTimer.current = setTimeout(() => { pushConfig({ bet_amount: num }); }, 600);
   }, [config]);
 
-  const clampHour = (v, max) => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
+  const parseHHMM = (value) => {
+    if (!value || typeof value !== 'string') return { h: 0, m: 0 };
+    const [hh, mm] = value.split(':');
+    const h = Math.max(0, Math.min(23, parseInt(hh, 10) || 0));
+    const m = Math.max(0, Math.min(59, parseInt(mm, 10) || 0));
+    return { h, m };
+  };
+
+  const formatHHMM = (h, m) =>
+    `${String(h ?? 0).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`;
 
   const handleBlockStart = useCallback((value) => {
-    const num = clampHour(value, 23);
-    setConfig((p) => ({ ...p, block_hour_start: num }));
+    const { h, m } = parseHHMM(value);
+    setConfig((p) => ({ ...p, block_hour_start: h, block_minute_start: m }));
     if (blockStartTimer.current) clearTimeout(blockStartTimer.current);
-    blockStartTimer.current = setTimeout(() => { pushConfig({ block_hour_start: num }); }, 600);
+    blockStartTimer.current = setTimeout(() => {
+      pushConfig({ block_hour_start: h, block_minute_start: m });
+    }, 600);
   }, [config]);
 
   const handleBlockEnd = useCallback((value) => {
-    const num = clampHour(value, 24);
-    setConfig((p) => ({ ...p, block_hour_end: num }));
+    const { h, m } = parseHHMM(value);
+    setConfig((p) => ({ ...p, block_hour_end: h, block_minute_end: m }));
     if (blockEndTimer.current) clearTimeout(blockEndTimer.current);
-    blockEndTimer.current = setTimeout(() => { pushConfig({ block_hour_end: num }); }, 600);
+    blockEndTimer.current = setTimeout(() => {
+      pushConfig({ block_hour_end: h, block_minute_end: m });
+    }, 600);
   }, [config]);
 
   const handleSimulate = async () => {
@@ -162,16 +183,16 @@ export default function TradingRoom({ refreshKey }) {
 
           <div
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            title="Skip auto-trade on pure injury-report batches whose ET hour falls in this window. News still trades."
+            title="Skip auto-trade on pure injury-report batches whose ET time falls in this window. News still trades."
           >
             <label style={{ fontSize: 13, color: '#64748b' }}>Block injury-report (ET):</label>
-            <input className="form-input" type="number" min={0} max={23}
-              value={config.block_hour_start}
-              onChange={(e) => handleBlockStart(e.target.value)} style={{ width: 60 }} />
+            <input className="form-input" type="time"
+              value={formatHHMM(config.block_hour_start, config.block_minute_start)}
+              onChange={(e) => handleBlockStart(e.target.value)} style={{ width: 110 }} />
             <span style={{ fontSize: 13, color: '#64748b' }}>–</span>
-            <input className="form-input" type="number" min={0} max={24}
-              value={config.block_hour_end}
-              onChange={(e) => handleBlockEnd(e.target.value)} style={{ width: 60 }} />
+            <input className="form-input" type="time"
+              value={formatHHMM(config.block_hour_end, config.block_minute_end)}
+              onChange={(e) => handleBlockEnd(e.target.value)} style={{ width: 110 }} />
           </div>
 
           <button className="btn btn-danger btn-sm" onClick={() => { clearBetLog().then(() => setBetLog([])); }}>

@@ -1190,8 +1190,13 @@ def _evaluate_auto_trade(force: bool = False):
         # window. During that window the official injury report drops and most
         # "out" players are already known — news items (twitter/Underdog/etc.)
         # still trigger trades because they have a non-empty `source`.
-        if _is_blocked_injury_report_batch(batch, block_start, block_end):
-            log.info(f"Auto-trade skipped (block window {block_start}-{block_end}): {batch.get('matchup', '')} batch_time={batch_time}")
+        if _is_blocked_injury_report_batch(batch, block_start_min, block_end_min):
+            log.info(
+                f"Auto-trade skipped (block window "
+                f"{block_start_min // 60:02d}:{block_start_min % 60:02d}-"
+                f"{block_end_min // 60:02d}:{block_end_min % 60:02d} ET): "
+                f"{batch.get('matchup', '')} batch_time={batch_time}"
+            )
             continue
 
         edge_score = batch.get("edge_score", 0)
@@ -1916,6 +1921,8 @@ def get_betting_config():
             "bet_amount": state.bet_amount,
             "block_hour_start": state.bet_block_hour_start,
             "block_hour_end": state.bet_block_hour_end,
+            "block_minute_start": state.bet_block_minute_start,
+            "block_minute_end": state.bet_block_minute_end,
         })
 
 
@@ -1928,6 +1935,8 @@ def update_betting_config(payload: BettingConfigUpdate):
         state.bet_amount = payload.bet_amount
         state.bet_block_hour_start = max(0, min(23, int(payload.block_hour_start)))
         state.bet_block_hour_end = max(0, min(24, int(payload.block_hour_end)))
+        state.bet_block_minute_start = max(0, min(59, int(payload.block_minute_start)))
+        state.bet_block_minute_end = max(0, min(59, int(payload.block_minute_end)))
         # Arm watermark when toggling ON — only trade batches arriving after this moment
         if was_off and state.auto_trade_enabled:
             state.auto_trade_armed_at = datetime.now(ET).isoformat()
@@ -1935,6 +1944,7 @@ def update_betting_config(payload: BettingConfigUpdate):
         db.save_betting_config(
             state.auto_trade_enabled, state.bet_threshold, state.bet_amount,
             state.bet_block_hour_start, state.bet_block_hour_end,
+            state.bet_block_minute_start, state.bet_block_minute_end,
         )
     return JSONResponse({
         "ok": True,
@@ -1943,6 +1953,8 @@ def update_betting_config(payload: BettingConfigUpdate):
         "bet_amount": state.bet_amount,
         "block_hour_start": state.bet_block_hour_start,
         "block_hour_end": state.bet_block_hour_end,
+        "block_minute_start": state.bet_block_minute_start,
+        "block_minute_end": state.bet_block_minute_end,
     })
 
 
